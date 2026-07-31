@@ -2,9 +2,10 @@
 
 import { useState, type ReactNode } from "react";
 import { cn } from "@tael/ui";
-import type { Product, ProductContent } from "@tael/database";
+import type { Product, ProductAction, ProductContent } from "@tael/database";
 import { ProductSettingsForm } from "./product-settings-form";
 import { TrainContentPanel } from "./train-content-panel";
+import { TrainActionsPanel } from "./train-actions-panel";
 
 const TABS = [
   { id: "train", label: "Train" },
@@ -24,8 +25,16 @@ function ComingSoon({ title, description }: { title: string; description: string
   );
 }
 
-/** Tab shells for Train / Test / Deploy / Analyze. Train hosts content + settings. */
-export function StudioTabs({ product, content }: { product: Product; content: ProductContent[] }) {
+/** Tab shells for Train / Test / Deploy / Analyze. Train hosts content + actions + settings. */
+export function StudioTabs({
+  product,
+  content,
+  actions,
+}: {
+  product: Product;
+  content: ProductContent[];
+  actions: ProductAction[];
+}) {
   const [tab, setTab] = useState<TabId>("train");
 
   let body: ReactNode;
@@ -34,10 +43,7 @@ export function StudioTabs({ product, content }: { product: Product; content: Pr
       body = (
         <div className="space-y-6">
           <TrainContentPanel productId={product.id} items={content} />
-          <ComingSoon
-            title="Actions"
-            description="Connect capabilities and HTTP actions the agent can run. Coming in a later task."
-          />
+          <TrainActionsPanel productId={product.id} items={actions} />
           <ProductSettingsForm product={product} />
         </div>
       );

@@ -3,9 +3,11 @@ import {
   and,
   desc,
   eq,
+  productActions,
   productContent,
   products,
   type Product,
+  type ProductAction,
   type ProductContent,
 } from "@tael/database";
 import { db } from "../../lib/db";
@@ -57,6 +59,28 @@ export async function listContent(productId: string): Promise<ProductContent[]> 
 }
 
 /**
+ * List actions for a product the signed-in user owns, newest first.
+ * Returns [] when the product is missing or not owned.
+ */
+export async function listActions(productId: string): Promise<ProductAction[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const [owned] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.ownerId, user.id)))
+    .limit(1);
+  if (!owned) return [];
+
+  return db
+    .select()
+    .from(productActions)
+    .where(eq(productActions.productId, productId))
+    .orderBy(desc(productActions.createdAt));
+}
+
+/**
  * Public lookup by embed key. Used by the widget chat endpoint.
  * Returns the full row for server use; never serialize owner fields to clients.
  */
@@ -77,4 +101,16 @@ export async function getProductContentForChat(productId: string): Promise<Produ
     .from(productContent)
     .where(and(eq(productContent.productId, productId), eq(productContent.enabled, true)))
     .orderBy(desc(productContent.createdAt));
+}
+
+/**
+ * Enabled actions for a product, for chat tool calling. Not owner-scoped: callers
+ * must already have resolved a public (or preview) product.
+ */
+export async function getProductActionsForChat(productId: string): Promise<ProductAction[]> {
+  return db
+    .select()
+    .from(productActions)
+    .where(and(eq(productActions.productId, productId), eq(productActions.enabled, true)))
+    .orderBy(desc(productActions.createdAt));
 }

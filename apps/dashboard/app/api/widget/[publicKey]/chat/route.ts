@@ -1,15 +1,21 @@
 import {
+  getProductActionsForChat,
   getProductByPublicKey,
   getProductContentForChat,
 } from "../../../../../features/products/queries";
 import {
+  actionIdFromToolName,
   buildWidgetSystemPrompt,
+  buildWidgetTools,
   createRateLimiter,
+  proposeWidgetAction,
+  type ProposedWidgetAction,
 } from "../../../../../features/products/widget-chat";
 
 // Public per-product widget chat. Answers from that product's enabled content
-// only. No auth: the publicKey is the Stripe-style publishable key. Node
-// runtime for the OpenRouter key; room for a single model hop.
+// and can PROPOSE enabled actions (confirm-gated; never runs them here).
+// No auth: the publicKey is the Stripe-style publishable key. Node runtime for
+// the OpenRouter key; room for a short tool loop.
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
@@ -17,6 +23,7 @@ const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
 const MAX_TOKENS = 700;
 const MAX_MESSAGES = 20;
+const MAX_TOOL_HOPS = 3;
 
 const allowRequest = createRateLimiter(20, 60_000);
 
@@ -27,13 +34,21 @@ const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Max-Age": "86400",
 };
 
+interface ToolCall {
+  id: string;
+  function: { name: string; arguments: string };
+}
+
 interface ChatMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
+  role: string;
+  content: string | null;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string;
 }
 
 interface OpenRouterResponse {
-  choices?: { message?: { content?: string | null } }[];
+  choices?: { message?: ChatMessage }[];
 }
 
 interface WidgetChatBody {
@@ -62,6 +77,20 @@ function json(data: unknown, status = 200): Response {
       },
     }),
   );
+}
+
+function reply(text: string, action: ProposedWidgetAction | null = null): Response {
+  return json({ reply: text, action });
+}
+
+function safeParseArgs(raw: string | undefined): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    const v: unknown = JSON.parse(raw);
+    return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
 }
 
 export async function OPTIONS() {
@@ -96,7 +125,7 @@ export async function POST(request: Request, context: { params: Promise<{ public
     return json({ error: "messages is required." }, 400);
   }
 
-  const cleaned: ChatMessage[] = [];
+  const cleaned: { role: "user" | "assistant"; content: string }[] = [];
   for (const m of messages) {
     if (!m || (m.role !== "user" && m.role !== "assistant")) continue;
     if (typeof m.content !== "string" || !m.content.trim()) continue;
@@ -106,8 +135,13 @@ export async function POST(request: Request, context: { params: Promise<{ public
     return json({ error: "The last message must be from the user." }, 400);
   }
 
-  const content = await getProductContentForChat(product.id);
-  const system = buildWidgetSystemPrompt(product, content);
+  const [content, actions] = await Promise.all([
+    getProductContentForChat(product.id),
+    getProductActionsForChat(product.id),
+  ]);
+  const system = buildWidgetSystemPrompt(product, content, actions);
+  const tools = buildWidgetTools(actions);
+  const actionsById = new Map(actions.map((a) => [a.id, a]));
 
   const convo: ChatMessage[] = [
     { role: "system", content: system },
@@ -115,33 +149,66 @@ export async function POST(request: Request, context: { params: Promise<{ public
   ];
 
   try {
-    const resp = await fetch(OPENROUTER_URL, {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${apiKey}`,
-        "content-type": "application/json",
-        "HTTP-Referer": "https://taelprotocol.xyz",
-        "X-Title": "Tael Widget Agent",
-      },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: convo,
-        max_tokens: MAX_TOKENS,
-        temperature: 0.3,
-      }),
-    });
+    for (let hop = 0; hop < MAX_TOOL_HOPS; hop += 1) {
+      const resp = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          "content-type": "application/json",
+          "HTTP-Referer": "https://taelprotocol.xyz",
+          "X-Title": "Tael Widget Agent",
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: convo,
+          ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
+          max_tokens: MAX_TOKENS,
+          temperature: 0.3,
+        }),
+      });
 
-    if (!resp.ok) {
-      return json({ error: "The agent is unavailable right now. Please try again." }, 502);
+      if (!resp.ok) {
+        return json({ error: "The agent is unavailable right now. Please try again." }, 502);
+      }
+
+      const data = (await resp.json()) as OpenRouterResponse;
+      const message = data.choices?.[0]?.message;
+      if (!message) {
+        return json({ error: "No response from the agent. Please try again." }, 502);
+      }
+
+      if (message.tool_calls?.length) {
+        // A write proposal is terminal: resolve the first matching action tool
+        // and return a confirm card. Do not execute server-side.
+        for (const call of message.tool_calls) {
+          const actionId = actionIdFromToolName(call.function.name);
+          if (!actionId) continue;
+          const action = actionsById.get(actionId);
+          if (!action) continue;
+          const proposed = proposeWidgetAction(action, safeParseArgs(call.function.arguments));
+          return reply(proposed.reply, proposed.action);
+        }
+        // Unknown tools: tell the model and continue (should be rare).
+        convo.push(message);
+        for (const call of message.tool_calls) {
+          convo.push({
+            role: "tool",
+            tool_call_id: call.id,
+            name: call.function.name,
+            content: JSON.stringify({ error: "unknown or disabled action" }),
+          });
+        }
+        continue;
+      }
+
+      const text = typeof message.content === "string" ? message.content.trim() : "";
+      if (!text) {
+        return json({ error: "No response from the agent. Please try again." }, 502);
+      }
+      return reply(text, null);
     }
 
-    const data = (await resp.json()) as OpenRouterResponse;
-    const reply = data.choices?.[0]?.message?.content?.trim() ?? "";
-    if (!reply) {
-      return json({ error: "No response from the agent. Please try again." }, 502);
-    }
-
-    return json({ reply });
+    return reply("I couldn't quite finish that. Try rephrasing?");
   } catch {
     return json({ error: "Something went wrong. Please try again." }, 502);
   }
