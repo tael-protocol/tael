@@ -40,6 +40,34 @@ function isBlockedUrl(raw: string): boolean {
   );
 }
 
+/**
+ * Fetch a URL while re-validating every redirect hop against the SSRF guard, so
+ * a public page cannot 302 us onto an internal host (cloud metadata, localhost).
+ * Uses manual redirects and follows up to `maxHops` of them.
+ */
+async function fetchNoSsrf(startUrl: string, maxHops = 4): Promise<Response> {
+  let current = startUrl;
+  for (let hop = 0; hop <= maxHops; hop += 1) {
+    if (isBlockedUrl(current)) throw new Error("blocked");
+    const res = await fetch(current, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: {
+        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
+        "User-Agent": "TaelStudioBot/1.0 (+https://taelprotocol.xyz)",
+      },
+    });
+    if (res.status >= 300 && res.status < 400) {
+      const location = res.headers.get("location");
+      if (!location) return res;
+      current = new URL(location, current).toString();
+      continue;
+    }
+    return res;
+  }
+  throw new Error("too many redirects");
+}
+
 async function assertProductOwner(
   productId: string,
   userId: string,
@@ -211,14 +239,7 @@ export async function syncWebsite(productId: string, url: string): Promise<Actio
 
   let html: string;
   try {
-    const res = await fetch(parsed.data, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: {
-        Accept: "text/html,application/xhtml+xml;q=0.9,*/*;q=0.8",
-        "User-Agent": "TaelStudioBot/1.0 (+https://taelprotocol.xyz)",
-      },
-    });
+    const res = await fetchNoSsrf(parsed.data);
     if (!res.ok) {
       return { ok: false, error: `Could not fetch the page (${res.status}).` };
     }
