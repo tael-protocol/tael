@@ -55,3 +55,26 @@ export async function listContent(productId: string): Promise<ProductContent[]> 
     .where(eq(productContent.productId, productId))
     .orderBy(desc(productContent.createdAt));
 }
+
+/**
+ * Public lookup by embed key. Used by the widget chat endpoint.
+ * Returns the full row for server use; never serialize owner fields to clients.
+ */
+export async function getProductByPublicKey(publicKey: string): Promise<Product | null> {
+  const key = publicKey.trim();
+  if (!key) return null;
+  const rows = await db.select().from(products).where(eq(products.publicKey, key)).limit(1);
+  return rows[0] ?? null;
+}
+
+/**
+ * Enabled content for a product, for chat grounding. Not owner-scoped: callers
+ * must already have resolved a public (or preview) product.
+ */
+export async function getProductContentForChat(productId: string): Promise<ProductContent[]> {
+  return db
+    .select()
+    .from(productContent)
+    .where(and(eq(productContent.productId, productId), eq(productContent.enabled, true)))
+    .orderBy(desc(productContent.createdAt));
+}
