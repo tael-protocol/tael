@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
+import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   Button,
@@ -12,7 +12,8 @@ import {
   Input,
   Textarea,
 } from "@tael/ui";
-import { addContent, syncWebsite } from "./content-actions";
+import type { ProductContent } from "@tael/database";
+import { addContent, syncWebsite, updateContent } from "./content-actions";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -258,6 +259,93 @@ export function FaqDialog({
             disabled={pending || !question.trim() || !answer.trim()}
           >
             {pending ? "Saving…" : "Add FAQ"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Edit an existing content row (title + body). */
+export function EditContentDialog({
+  open,
+  onClose,
+  item,
+}: {
+  open: boolean;
+  onClose: () => void;
+  item: ProductContent | null;
+}) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [title, setTitle] = useState("");
+  const [body, setBody] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open && item) {
+      setTitle(item.title);
+      setBody(item.body);
+      setError(null);
+    }
+  }, [open, item]);
+
+  function reset() {
+    setTitle("");
+    setBody("");
+    setError(null);
+  }
+
+  function submit() {
+    if (!item) return;
+    setError(null);
+    startTransition(async () => {
+      const res = await updateContent(item.id, { title, body });
+      if (res.ok) {
+        reset();
+        onClose();
+        router.refresh();
+      } else {
+        setError(res.error ?? "Could not save.");
+      }
+    });
+  }
+
+  const isFaq = item?.type === "faq";
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(o) => {
+        if (!o) {
+          reset();
+          onClose();
+        }
+      }}
+    >
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Edit {isFaq ? "FAQ" : "content"}</DialogTitle>
+          <DialogDescription>Update what the agent can use from this source.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Field label={isFaq ? "Question" : "Title"}>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} autoFocus />
+          </Field>
+          <Field label={isFaq ? "Answer" : "Content"}>
+            <Textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={item?.type === "doc" ? 8 : 4}
+            />
+          </Field>
+          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <Button
+            className="w-full"
+            onClick={submit}
+            disabled={pending || !title.trim() || !body.trim()}
+          >
+            {pending ? "Saving…" : "Save changes"}
           </Button>
         </div>
       </DialogContent>

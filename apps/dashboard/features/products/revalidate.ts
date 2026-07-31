@@ -12,4 +12,5 @@ export function revalidateStudioPaths() {
   revalidatePath("/studio/test");
   revalidatePath("/studio/deploy");
   revalidatePath("/studio/inbox");
+  revalidatePath("/studio/settings");
 }

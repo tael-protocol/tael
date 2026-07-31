@@ -11,6 +11,7 @@ import {
   ArrowLeftRight,
   Rocket,
   Settings,
+  SlidersHorizontal,
   Star,
   Store,
   Wallet,
@@ -55,6 +56,7 @@ export const navGroups: NavGroup[] = [
       { label: "Test", href: "/studio/test", icon: FlaskConical },
       { label: "Deploy", href: "/studio/deploy", icon: Rocket },
       { label: "Inbox", href: "/studio/inbox", icon: Inbox },
+      { label: "Settings", href: "/studio/settings", icon: SlidersHorizontal },
     ],
   },
   {

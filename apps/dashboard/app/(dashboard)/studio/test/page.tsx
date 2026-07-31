@@ -10,7 +10,7 @@ export default async function StudioTestPage() {
   if (!product) notFound();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8">
+    <div className="mx-auto max-w-lg space-y-8">
       <PageHeader
         title="Test"
         description="Chat with your agent before it goes live. Uses preview mode so drafts work too."

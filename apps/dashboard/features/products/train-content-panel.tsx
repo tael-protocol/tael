@@ -2,7 +2,7 @@ import type { ProductContent } from "@tael/database";
 import { AddContentForms } from "./add-content-forms";
 import { ContentList } from "./content-list";
 
-/** Train → Content: add docs/snippets/FAQs/website sync and manage the list. */
+/** Train → Content: Fin-style add cards + your content list. */
 export function TrainContentPanel({
   productId,
   items,
@@ -11,15 +11,24 @@ export function TrainContentPanel({
   items: ProductContent[];
 }) {
   return (
-    <section className="space-y-4 rounded-xl border p-5">
+    <section className="space-y-6">
       <div>
-        <h2 className="text-base font-semibold">Content</h2>
-        <p className="text-sm text-muted-foreground">
-          What this agent knows. Enabled items are used when someone chats with it.
+        <h2 className="text-base font-semibold">Add content</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Sources your agent can learn from. Enabled items are used in chat.
         </p>
       </div>
       <AddContentForms productId={productId} />
-      <ContentList items={items} />
+
+      <div className="space-y-3 pt-2">
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-base font-semibold">Your content</h2>
+          <span className="text-xs text-muted-foreground">
+            {items.length} {items.length === 1 ? "source" : "sources"}
+          </span>
+        </div>
+        <ContentList items={items} />
+      </div>
     </section>
   );
 }

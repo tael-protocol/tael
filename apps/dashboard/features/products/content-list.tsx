@@ -1,67 +1,92 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { FileText, Globe, HelpCircle, Quote, Trash2 } from "lucide-react";
-import { Button, cn } from "@tael/ui";
+import {
+  FileText,
+  Globe,
+  HelpCircle,
+  MoreHorizontal,
+  Pencil,
+  Power,
+  Quote,
+  Trash2,
+} from "lucide-react";
+import {
+  Badge,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  cn,
+} from "@tael/ui";
 import type { ProductContent } from "@tael/database";
 import { deleteContent, toggleContent } from "./content-actions";
+import { EditContentDialog } from "./content-dialogs";
 
 const TYPE_META: Record<
   ProductContent["type"],
-  { label: string; icon: typeof FileText; badge: string }
+  { label: string; icon: typeof FileText; tone: string }
 > = {
   doc: {
     label: "Doc",
     icon: FileText,
-    badge: "border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300",
+    tone: "bg-sky-500/10 text-sky-700 dark:text-sky-300",
   },
   snippet: {
     label: "Snippet",
     icon: Quote,
-    badge: "border-violet-500/30 bg-violet-500/10 text-violet-700 dark:text-violet-300",
+    tone: "bg-violet-500/10 text-violet-700 dark:text-violet-300",
   },
   website: {
     label: "Website",
     icon: Globe,
-    badge: "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+    tone: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
   },
   faq: {
     label: "FAQ",
     icon: HelpCircle,
-    badge: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+    tone: "bg-amber-500/10 text-amber-700 dark:text-amber-300",
   },
 };
 
 export function ContentList({ items }: { items: ProductContent[] }) {
+  const [editing, setEditing] = useState<ProductContent | null>(null);
+
   if (items.length === 0) {
     return (
-      <p className="rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
-        No content yet. Add a doc, snippet, FAQ, or sync a website to train this agent.
+      <p className="rounded-xl border border-dashed px-4 py-12 text-center text-sm text-muted-foreground">
+        No content yet. Add a website, doc, snippet, or FAQ to train this agent.
       </p>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border">
-      <ul className="divide-y">
-        {items.map((item) => (
-          <ContentRow key={item.id} item={item} />
-        ))}
-      </ul>
-    </div>
+    <>
+      <div className="overflow-hidden rounded-xl border">
+        <ul className="divide-y">
+          {items.map((item) => (
+            <ContentRow key={item.id} item={item} onEdit={() => setEditing(item)} />
+          ))}
+        </ul>
+      </div>
+      <EditContentDialog open={editing != null} onClose={() => setEditing(null)} item={editing} />
+    </>
   );
 }
 
-function ContentRow({ item }: { item: ProductContent }) {
+function ContentRow({ item, onEdit }: { item: ProductContent; onEdit: () => void }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [menuOpen, setMenuOpen] = useState(false);
   const meta = TYPE_META[item.type];
   const Icon = meta.icon;
 
-  function onToggle(enabled: boolean) {
+  function onToggle() {
     startTransition(async () => {
-      await toggleContent(item.id, enabled);
+      await toggleContent(item.id, !item.enabled);
       router.refresh();
     });
   }
@@ -74,46 +99,78 @@ function ContentRow({ item }: { item: ProductContent }) {
   }
 
   return (
-    <li className="flex items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/30">
+    <li className="flex items-center gap-3 px-4 py-4 transition-colors hover:bg-muted/30">
       <span
         className={cn(
-          "inline-flex shrink-0 items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-semibold",
-          meta.badge,
+          "inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+          meta.tone,
         )}
+        title={meta.label}
       >
-        <Icon className="h-3.5 w-3.5" /> {meta.label}
+        <Icon className="h-5 w-5" />
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{item.title}</p>
-        {item.sourceUrl ? (
-          <p className="truncate text-xs text-muted-foreground">{item.sourceUrl}</p>
-        ) : null}
+        <p className="truncate text-sm font-semibold">{item.title}</p>
+        <p className="truncate text-xs text-muted-foreground">{item.sourceUrl ?? meta.label}</p>
       </div>
 
-      <label className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
-        <span className="hidden sm:inline">{item.enabled ? "Enabled" : "Disabled"}</span>
-        <input
-          type="checkbox"
-          checked={item.enabled}
-          disabled={pending}
-          onChange={(e) => onToggle(e.target.checked)}
-          className="h-4 w-4 accent-foreground"
-          aria-label={item.enabled ? "Disable content" : "Enable content"}
-        />
-      </label>
-
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        disabled={pending}
-        onClick={onDelete}
-        aria-label={`Delete ${item.title}`}
-        className="shrink-0 text-muted-foreground hover:text-destructive"
+      <Badge
+        variant="outline"
+        className={cn(
+          "shrink-0 font-medium",
+          item.enabled
+            ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+            : "text-muted-foreground",
+        )}
       >
-        <Trash2 className="h-4 w-4" />
-      </Button>
+        {item.enabled ? "Enabled" : "Disabled"}
+      </Badge>
+
+      <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={pending}
+            aria-label={`Actions for ${item.title}`}
+            className="h-8 w-8 shrink-0 p-0 text-muted-foreground"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem
+            onSelect={() => {
+              setMenuOpen(false);
+              onEdit();
+            }}
+          >
+            <Pencil className="h-4 w-4" /> Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem
+            disabled={pending}
+            onSelect={() => {
+              setMenuOpen(false);
+              onToggle();
+            }}
+          >
+            <Power className="h-4 w-4" /> {item.enabled ? "Disable" : "Enable"}
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive focus:text-destructive"
+            disabled={pending}
+            onSelect={() => {
+              setMenuOpen(false);
+              onDelete();
+            }}
+          >
+            <Trash2 className="h-4 w-4" /> Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </li>
   );
 }
