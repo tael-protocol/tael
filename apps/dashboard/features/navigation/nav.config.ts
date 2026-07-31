@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   ArrowLeftRight,
   Settings,
+  Sparkles,
   Star,
   Store,
   Wallet,
@@ -42,6 +43,7 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "My Capabilities", href: "/capabilities", icon: Boxes },
       { label: "Cards", href: "/agents", icon: CreditCard },
+      { label: "Studio", href: "/studio", icon: Sparkles },
     ],
   },
   {
