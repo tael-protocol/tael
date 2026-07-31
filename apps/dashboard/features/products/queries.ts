@@ -1,5 +1,13 @@
 import "server-only";
-import { and, desc, eq, products, type Product } from "@tael/database";
+import {
+  and,
+  desc,
+  eq,
+  productContent,
+  products,
+  type Product,
+  type ProductContent,
+} from "@tael/database";
 import { db } from "../../lib/db";
 import { getCurrentUser } from "../capabilities/current-user";
 
@@ -24,4 +32,26 @@ export async function getProduct(id: string): Promise<Product | null> {
     .where(and(eq(products.id, id), eq(products.ownerId, user.id)))
     .limit(1);
   return rows[0] ?? null;
+}
+
+/**
+ * List content for a product the signed-in user owns, newest first.
+ * Returns [] when the product is missing or not owned.
+ */
+export async function listContent(productId: string): Promise<ProductContent[]> {
+  const user = await getCurrentUser();
+  if (!user) return [];
+
+  const [owned] = await db
+    .select({ id: products.id })
+    .from(products)
+    .where(and(eq(products.id, productId), eq(products.ownerId, user.id)))
+    .limit(1);
+  if (!owned) return [];
+
+  return db
+    .select()
+    .from(productContent)
+    .where(eq(productContent.productId, productId))
+    .orderBy(desc(productContent.createdAt));
 }

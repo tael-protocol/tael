@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
-import { getProduct } from "../../../../features/products/queries";
+import { getProduct, listContent } from "../../../../features/products/queries";
 import { StudioTabs } from "../../../../features/products/studio-tabs";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +10,7 @@ export default async function StudioDetailPage({ params }: { params: Promise<{ i
   const { id } = await params;
   const product = await getProduct(id);
   if (!product) notFound();
+  const content = await listContent(id);
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -45,7 +46,7 @@ export default async function StudioDetailPage({ params }: { params: Promise<{ i
         </div>
       </div>
 
-      <StudioTabs product={product} />
+      <StudioTabs product={product} content={content} />
     </div>
   );
 }
