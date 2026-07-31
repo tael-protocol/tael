@@ -4,7 +4,8 @@ import { z } from "zod";
 import { and, eq, productActions, products } from "@tael/database";
 import { db } from "../../lib/db";
 import { getCurrentUser } from "../capabilities/current-user";
-import { revalidateStudioPaths, type ActionResult } from "./actions";
+import { type ActionResult } from "./actions";
+import { revalidateStudioPaths } from "./revalidate";
 
 const nameSchema = z.string().trim().min(1, "Name is required").max(80);
 const descriptionSchema = z.string().trim().min(1, "Description is required").max(1000);

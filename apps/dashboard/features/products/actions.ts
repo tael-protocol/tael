@@ -1,10 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq, products } from "@tael/database";
 import { db } from "../../lib/db";
 import { getCurrentUser } from "../capabilities/current-user";
+import { revalidateStudioPaths } from "./revalidate";
 
 const nameSchema = z.string().trim().min(1, "Name is required").max(80);
 const brandColorSchema = z
@@ -19,15 +19,6 @@ export interface ActionResult {
   ok: boolean;
   error?: string;
   id?: string;
-}
-
-/** Revalidate every Studio page after a product mutation. */
-export function revalidateStudioPaths() {
-  revalidatePath("/studio");
-  revalidatePath("/studio/train");
-  revalidatePath("/studio/test");
-  revalidatePath("/studio/deploy");
-  revalidatePath("/studio/inbox");
 }
 
 const updateProductSchema = z.object({

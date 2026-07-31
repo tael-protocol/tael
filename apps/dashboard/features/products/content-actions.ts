@@ -4,7 +4,8 @@ import { z } from "zod";
 import { and, eq, productContent, products } from "@tael/database";
 import { db } from "../../lib/db";
 import { getCurrentUser } from "../capabilities/current-user";
-import { revalidateStudioPaths, type ActionResult } from "./actions";
+import { type ActionResult } from "./actions";
+import { revalidateStudioPaths } from "./revalidate";
 import { extractTitle, htmlToText, MAX_BODY_BYTES } from "./html-to-text";
 
 const FETCH_TIMEOUT_MS = 15_000;
