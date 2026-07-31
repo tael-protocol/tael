@@ -6,6 +6,7 @@ import type { Product, ProductAction, ProductContent } from "@tael/database";
 import { ProductSettingsForm } from "./product-settings-form";
 import { TrainContentPanel } from "./train-content-panel";
 import { TrainActionsPanel } from "./train-actions-panel";
+import { DeployPanel } from "./deploy-panel";
 
 const TABS = [
   { id: "train", label: "Train" },
@@ -25,7 +26,7 @@ function ComingSoon({ title, description }: { title: string; description: string
   );
 }
 
-/** Tab shells for Train / Test / Deploy / Analyze. Train hosts content + actions + settings. */
+/** Tab shells for Train / Test / Deploy / Analyze. */
 export function StudioTabs({
   product,
   content,
@@ -57,12 +58,7 @@ export function StudioTabs({
       );
       break;
     case "deploy":
-      body = (
-        <ComingSoon
-          title="Embed & channels"
-          description="Grab the embed snippet and toggle Website, Discord, Telegram, or MCP. Coming soon."
-        />
-      );
+      body = <DeployPanel product={product} />;
       break;
     case "analyze":
       body = (
