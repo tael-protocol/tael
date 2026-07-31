@@ -1,11 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq, productActions, products } from "@tael/database";
 import { db } from "../../lib/db";
 import { getCurrentUser } from "../capabilities/current-user";
-import type { ActionResult } from "./actions";
+import { revalidateStudioPaths, type ActionResult } from "./actions";
 
 const nameSchema = z.string().trim().min(1, "Name is required").max(80);
 const descriptionSchema = z.string().trim().min(1, "Description is required").max(1000);
@@ -72,11 +71,6 @@ async function assertActionOwner(
   return { ok: true, productId: row.productId };
 }
 
-function revalidateStudio(productId: string) {
-  revalidatePath("/studio");
-  revalidatePath(`/studio/${productId}`);
-}
-
 export type AddActionInput = z.infer<typeof addActionSchema>;
 
 /** Insert an action for a product the signed-in user owns. */
@@ -105,7 +99,7 @@ export async function addAction(productId: string, input: AddActionInput): Promi
       })
       .returning({ id: productActions.id });
 
-    revalidateStudio(productId);
+    revalidateStudioPaths();
     return { ok: true, id: row!.id };
   } catch {
     return { ok: false, error: "Could not add action. Try again." };
@@ -158,7 +152,7 @@ export async function updateAction(
 
   try {
     await db.update(productActions).set(patch).where(eq(productActions.id, actionId));
-    revalidateStudio(owned.productId);
+    revalidateStudioPaths();
     return { ok: true, id: actionId };
   } catch {
     return { ok: false, error: "Could not save. Try again." };
@@ -175,7 +169,7 @@ export async function deleteAction(actionId: string): Promise<ActionResult> {
 
   try {
     await db.delete(productActions).where(eq(productActions.id, actionId));
-    revalidateStudio(owned.productId);
+    revalidateStudioPaths();
     return { ok: true };
   } catch {
     return { ok: false, error: "Could not delete. Try again." };
@@ -192,7 +186,7 @@ export async function toggleAction(actionId: string, enabled: boolean): Promise<
 
   try {
     await db.update(productActions).set({ enabled }).where(eq(productActions.id, actionId));
-    revalidateStudio(owned.productId);
+    revalidateStudioPaths();
     return { ok: true, id: actionId };
   } catch {
     return { ok: false, error: "Could not update. Try again." };

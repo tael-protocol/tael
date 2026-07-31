@@ -1,9 +1,8 @@
 "use server";
 
-import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq, ilike, products } from "@tael/database";
+import { and, eq, products } from "@tael/database";
 import { db } from "../../lib/db";
 import { getCurrentUser } from "../capabilities/current-user";
 
@@ -22,75 +21,13 @@ export interface ActionResult {
   id?: string;
 }
 
-/** Build a URL-safe slug from a name (the action makes it unique on collision). */
-function slugify(name: string): string {
-  return name
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-}
-
-/**
- * Turn a base slug into a unique one. Returns the clean name when free;
- * falls back to `name-2`, `name-3`, … on collision.
- */
-async function uniqueSlug(base: string): Promise<string> {
-  const fallback = base || "agent";
-  const rows = await db
-    .select({ slug: products.slug })
-    .from(products)
-    .where(ilike(products.slug, `${fallback}%`));
-  const taken = new Set(rows.map((r) => r.slug));
-  if (!taken.has(fallback)) return fallback;
-  for (let i = 2; ; i += 1) {
-    const candidate = `${fallback}-${i}`;
-    if (!taken.has(candidate)) return candidate;
-  }
-}
-
-/** Stripe-style publishable key: `tael_pub_` + 24 hex chars. */
-function generatePublicKey(): string {
-  return `tael_pub_${randomBytes(12).toString("hex")}`;
-}
-
-const createProductSchema = z.object({
-  name: nameSchema,
-});
-
-/**
- * Create a product agent for the signed-in user. Generates a unique slug from
- * the name and a random publicKey safe to expose in the embed snippet.
- */
-export async function createProduct(input: { name: string }): Promise<ActionResult> {
-  const user = await getCurrentUser();
-  if (!user) return { ok: false, error: "Not signed in." };
-
-  const parsed = createProductSchema.safeParse(input);
-  if (!parsed.success) {
-    return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input." };
-  }
-
-  const slug = await uniqueSlug(slugify(parsed.data.name));
-  const publicKey = generatePublicKey();
-
-  try {
-    const [row] = await db
-      .insert(products)
-      .values({
-        ownerId: user.id,
-        name: parsed.data.name,
-        slug,
-        publicKey,
-      })
-      .returning({ id: products.id });
-
-    revalidatePath("/studio");
-    return { ok: true, id: row!.id };
-  } catch {
-    return { ok: false, error: "Could not create the agent. Try again." };
-  }
+/** Revalidate every Studio page after a product mutation. */
+export function revalidateStudioPaths() {
+  revalidatePath("/studio");
+  revalidatePath("/studio/train");
+  revalidatePath("/studio/test");
+  revalidatePath("/studio/deploy");
+  revalidatePath("/studio/inbox");
 }
 
 const updateProductSchema = z.object({
@@ -129,8 +66,7 @@ export async function updateProduct(
 
     if (!result[0]) return { ok: false, error: "Agent not found." };
 
-    revalidatePath("/studio");
-    revalidatePath(`/studio/${id}`);
+    revalidateStudioPaths();
     return { ok: true, id };
   } catch {
     return { ok: false, error: "Could not save. Try again." };
@@ -150,7 +86,7 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
 
     if (!result[0]) return { ok: false, error: "Agent not found." };
 
-    revalidatePath("/studio");
+    revalidateStudioPaths();
     return { ok: true };
   } catch {
     return { ok: false, error: "Could not delete. Try again." };

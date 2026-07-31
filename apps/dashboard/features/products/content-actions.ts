@@ -1,11 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { and, eq, productContent, products } from "@tael/database";
 import { db } from "../../lib/db";
 import { getCurrentUser } from "../capabilities/current-user";
-import type { ActionResult } from "./actions";
+import { revalidateStudioPaths, type ActionResult } from "./actions";
 import { extractTitle, htmlToText, MAX_BODY_BYTES } from "./html-to-text";
 
 const FETCH_TIMEOUT_MS = 15_000;
@@ -95,11 +94,6 @@ async function assertContentOwner(
   return { ok: true, productId: row.productId };
 }
 
-function revalidateStudio(productId: string) {
-  revalidatePath("/studio");
-  revalidatePath(`/studio/${productId}`);
-}
-
 const addContentSchema = z.object({
   type: contentTypeSchema,
   title: titleSchema,
@@ -140,7 +134,7 @@ export async function addContent(
       })
       .returning({ id: productContent.id });
 
-    revalidateStudio(productId);
+    revalidateStudioPaths();
     return { ok: true, id: row!.id };
   } catch {
     return { ok: false, error: "Could not add content. Try again." };
@@ -176,7 +170,7 @@ export async function updateContent(
 
   try {
     await db.update(productContent).set(patch).where(eq(productContent.id, contentId));
-    revalidateStudio(owned.productId);
+    revalidateStudioPaths();
     return { ok: true, id: contentId };
   } catch {
     return { ok: false, error: "Could not save. Try again." };
@@ -193,7 +187,7 @@ export async function deleteContent(contentId: string): Promise<ActionResult> {
 
   try {
     await db.delete(productContent).where(eq(productContent.id, contentId));
-    revalidateStudio(owned.productId);
+    revalidateStudioPaths();
     return { ok: true };
   } catch {
     return { ok: false, error: "Could not delete. Try again." };
@@ -210,7 +204,7 @@ export async function toggleContent(contentId: string, enabled: boolean): Promis
 
   try {
     await db.update(productContent).set({ enabled }).where(eq(productContent.id, contentId));
-    revalidateStudio(owned.productId);
+    revalidateStudioPaths();
     return { ok: true, id: contentId };
   } catch {
     return { ok: false, error: "Could not update. Try again." };
@@ -276,7 +270,7 @@ export async function syncWebsite(productId: string, url: string): Promise<Actio
       })
       .returning({ id: productContent.id });
 
-    revalidateStudio(productId);
+    revalidateStudioPaths();
     return { ok: true, id: row!.id };
   } catch {
     return { ok: false, error: "Could not save the synced page. Try again." };

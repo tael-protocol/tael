@@ -1,0 +1,21 @@
+import { notFound } from "next/navigation";
+import { PageHeader } from "../../../../components/page-header";
+import { TestPreviewPanel } from "../../../../features/products/test-preview-panel";
+import { getOrCreateProduct } from "../../../../features/products/queries";
+
+export const dynamic = "force-dynamic";
+
+export default async function StudioTestPage() {
+  const product = await getOrCreateProduct();
+  if (!product) notFound();
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-8">
+      <PageHeader
+        title="Test"
+        description="Chat with your agent before it goes live. Uses preview mode so drafts work too."
+      />
+      <TestPreviewPanel product={product} />
+    </div>
+  );
+}

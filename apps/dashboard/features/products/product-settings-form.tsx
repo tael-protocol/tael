@@ -28,15 +28,19 @@ export function ProductSettingsForm({ product }: { product: Product }) {
   const [name, setName] = useState(product.name);
   const [brandColor, setBrandColor] = useState(product.brandColor);
   const [greeting, setGreeting] = useState(product.greeting);
+  const [status, setStatus] = useState(product.status);
 
   const dirty =
-    name !== product.name || brandColor !== product.brandColor || greeting !== product.greeting;
+    name !== product.name ||
+    brandColor !== product.brandColor ||
+    greeting !== product.greeting ||
+    status !== product.status;
 
   function save() {
     setError(null);
     setSaved(false);
     startTransition(async () => {
-      const res = await updateProduct(product.id, { name, brandColor, greeting });
+      const res = await updateProduct(product.id, { name, brandColor, greeting, status });
       if (res.ok) {
         setSaved(true);
         router.refresh();
@@ -50,7 +54,7 @@ export function ProductSettingsForm({ product }: { product: Product }) {
   function remove() {
     startTransition(async () => {
       const res = await deleteProduct(product.id);
-      if (res.ok) router.push("/studio");
+      if (res.ok) router.push("/studio/train");
       else setError(res.error ?? "Could not delete.");
     });
   }
@@ -96,6 +100,22 @@ export function ProductSettingsForm({ product }: { product: Product }) {
             onChange={(e) => setGreeting(e.target.value)}
             placeholder="Hi! How can I help you today?"
             rows={3}
+          />
+        </label>
+
+        <label className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
+          <span className="space-y-0.5">
+            <span className="block text-sm font-medium">Live on your site</span>
+            <span className="block text-xs text-muted-foreground">
+              When on, visitors can use the embed. Draft still works in Test.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            checked={status === "live"}
+            onChange={(e) => setStatus(e.target.checked ? "live" : "draft")}
+            className="h-4 w-4 accent-foreground"
+            aria-label="Set agent live"
           />
         </label>
 
