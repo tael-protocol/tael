@@ -133,12 +133,12 @@ function FeaturesSection() {
           <h2 className="max-w-[600px] text-[28px] font-medium leading-[36px] tracking-[-2.44px] text-white md:text-[48px] md:leading-[60px] md:tracking-[-0.0508em]">
             Don&apos;t choose between
             <br />
-            freedom and experience.
+            control and simplicity.
           </h2>
           <p className="max-w-[650px] text-[14px] font-medium leading-5 tracking-normal text-[#B7B5BA]">
-            Your keys, Your funds. Trade over a million token with the experience of an exchange{" "}
+            Your keys, your funds. Do anything on-chain just by asking,{" "}
             <br className="hidden sm:block" />
-            the freedom of wallet.
+            and it never leaves your wallet.
           </p>
         </div>
 
