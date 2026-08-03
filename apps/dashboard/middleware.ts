@@ -38,7 +38,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Everything except Next internals, static assets, and the auth API routes
-  // (which must be reachable while signed out).
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api).*)"],
+  // Everything except Next internals, static assets, the public embed script,
+  // and the auth/API routes (which must be reachable while signed out).
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|embed\\.js|api).*)"],
 };

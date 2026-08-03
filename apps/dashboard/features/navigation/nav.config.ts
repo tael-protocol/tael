@@ -1,12 +1,17 @@
 import {
   BarChart3,
+  BookOpen,
   Boxes,
   Building2,
   CreditCard,
+  FlaskConical,
+  Inbox,
   KeyRound,
   LayoutDashboard,
   ArrowLeftRight,
+  Rocket,
   Settings,
+  SlidersHorizontal,
   Star,
   Store,
   Wallet,
@@ -42,6 +47,16 @@ export const navGroups: NavGroup[] = [
     items: [
       { label: "My Capabilities", href: "/capabilities", icon: Boxes },
       { label: "Cards", href: "/agents", icon: CreditCard },
+    ],
+  },
+  {
+    label: "Studio",
+    items: [
+      { label: "Train", href: "/studio/train", icon: BookOpen },
+      { label: "Test", href: "/studio/test", icon: FlaskConical },
+      { label: "Deploy", href: "/studio/deploy", icon: Rocket },
+      { label: "Inbox", href: "/studio/inbox", icon: Inbox },
+      { label: "Settings", href: "/studio/settings", icon: SlidersHorizontal },
     ],
   },
   {

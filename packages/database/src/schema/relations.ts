@@ -6,6 +6,7 @@ import { agents } from "./agents";
 import { payments } from "./payments";
 import { apiKeys } from "./api-keys";
 import { chatThreads, chatMessages } from "./chat";
+import { products, productContent, productActions } from "./products";
 
 // Typed relations enable Drizzle's relational query API (db.query.users.findMany
 // with `with: { wallets: true }`, etc.) without hand-written joins.
@@ -15,6 +16,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   agents: many(agents),
   capabilities: many(capabilities),
   apiKeys: many(apiKeys),
+  products: many(products),
 }));
 
 export const walletsRelations = relations(wallets, ({ one, many }) => ({
@@ -49,4 +51,18 @@ export const chatThreadsRelations = relations(chatThreads, ({ one, many }) => ({
 
 export const chatMessagesRelations = relations(chatMessages, ({ one }) => ({
   thread: one(chatThreads, { fields: [chatMessages.threadId], references: [chatThreads.id] }),
+}));
+
+export const productsRelations = relations(products, ({ one, many }) => ({
+  owner: one(users, { fields: [products.ownerId], references: [users.id] }),
+  content: many(productContent),
+  actions: many(productActions),
+}));
+
+export const productContentRelations = relations(productContent, ({ one }) => ({
+  product: one(products, { fields: [productContent.productId], references: [products.id] }),
+}));
+
+export const productActionsRelations = relations(productActions, ({ one }) => ({
+  product: one(products, { fields: [productActions.productId], references: [products.id] }),
 }));
