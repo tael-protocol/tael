@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AGENT_NAME,
   AGENT_TAGLINE,
+  DEMO_PROMPT_MESSAGE,
   GREETING,
   INTRO_BODY,
   INTRO_MESSAGE,
@@ -37,7 +38,10 @@ export function TaelAgent({
   const [teaser, setTeaser] = useState(false);
   const [draft, setDraft] = useState("");
   const [unread, setUnread] = useState(0);
+  const [introStep, setIntroStep] = useState(0);
   const { messages, streaming, send } = useAgentChat(endpoint);
+  const isFreshChat = messages.length === 0;
+  const showStoredIntro = !isFreshChat;
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const wasStreaming = useRef(false);
@@ -47,21 +51,93 @@ export function TaelAgent({
   // The teaser's tick can be autoplay-blocked on a fresh load; flush it on the
   // visitor's first gesture instead.
   const teaserSoundPending = useRef(false);
+  const openedFromKyc = useRef(false);
+  const lastScrollY = useRef(0);
+  const introTimers = useRef<number[]>([]);
 
-  // Proactive greeting: two seconds after load, nudge with the teaser card
-  // (unless the visitor already opened the panel).
+  const clearIntroTimers = useCallback(() => {
+    introTimers.current.forEach((timer) => window.clearTimeout(timer));
+    introTimers.current = [];
+  }, []);
+
+  const runIntroSequence = useCallback(() => {
+    clearIntroTimers();
+    setIntroStep(0);
+    introTimers.current = [
+      window.setTimeout(() => setIntroStep(1), 650),
+      window.setTimeout(() => setIntroStep(2), 1150),
+      window.setTimeout(() => setIntroStep(3), 1900),
+    ];
+  }, [clearIntroTimers]);
+
+  const openAgent = useCallback(() => {
+    teaserDone.current = true;
+    setTeaser(false);
+    setUnread(0);
+    setOpen(true);
+    if (messages.length === 0) {
+      runIntroSequence();
+    } else {
+      clearIntroTimers();
+      setIntroStep(0);
+    }
+  }, [clearIntroTimers, messages.length, runIntroSequence]);
+
+  const showTeaser = useCallback(() => {
+    if (open || messages.length > 0) return;
+    teaserDone.current = true;
+    setTeaser(true);
+    setUnread(1);
+    void playChime().then((ok) => {
+      if (!ok) teaserSoundPending.current = true;
+    });
+  }, [messages.length, open]);
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (teaserDone.current || open) return;
-      teaserDone.current = true;
-      setTeaser(true);
-      setUnread(1);
-      void playChime().then((ok) => {
-        if (!ok) teaserSoundPending.current = true;
-      });
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [open]);
+    return clearIntroTimers;
+  }, [clearIntroTimers]);
+
+  // Site CTAs can open the floating panel without coupling the marketing page
+  // to this component's internal state.
+  useEffect(() => {
+    window.addEventListener("tael-agent:open", openAgent);
+    return () => window.removeEventListener("tael-agent:open", openAgent);
+  }, [openAgent]);
+
+  // When the visitor scrolls down into the KYC section, open the side chat once.
+  useEffect(() => {
+    const kycSection = document.getElementById("kyc");
+    if (!kycSection) return;
+    lastScrollY.current = window.scrollY;
+
+    let frame = 0;
+    const checkKycPosition = () => {
+      frame = 0;
+      const currentScrollY = window.scrollY;
+      const scrollingDown = currentScrollY > lastScrollY.current;
+      lastScrollY.current = currentScrollY;
+
+      if (!scrollingDown || openedFromKyc.current) return;
+
+      const rect = kycSection.getBoundingClientRect();
+      const triggerLine = window.innerHeight * 0.65;
+      if (rect.top <= triggerLine && rect.bottom > triggerLine) {
+        openedFromKyc.current = true;
+        showTeaser();
+      }
+    };
+
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(checkKycPosition);
+    };
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [showTeaser]);
 
   // Browsers block audio before the first interaction, so the teaser tick above
   // may be silenced on a fresh load. Play it on the visitor's first gesture.
@@ -88,7 +164,26 @@ export function TaelAgent({
   // Keep the transcript pinned to the latest message as it streams in.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, open]);
+  }, [messages, open, introStep]);
+
+  // Let the static greeting feel like a real conversation:
+  // typing, first line, typing, then the follow-up prompt.
+  useEffect(() => {
+    if (!open) {
+      setIntroStep(0);
+      clearIntroTimers();
+      return;
+    }
+
+    if (messages.length > 0) {
+      clearIntroTimers();
+      setIntroStep(0);
+      return;
+    }
+
+    runIntroSequence();
+    return clearIntroTimers;
+  }, [clearIntroTimers, messages.length, open, runIntroSequence]);
 
   // On open: focus the input, clear the teaser + unread dot, and ask once for
   // permission to send browser notifications (to nudge when the panel is closed).
@@ -245,17 +340,37 @@ export function TaelAgent({
 
             {/* Transcript */}
             <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
-              {/* Intro is always shown, above the live transcript. */}
-              <MessageBubble message={{ id: "intro", role: "assistant", content: intro }} />
-
-              {messages.length === 0 && (
-                <div className="flex flex-wrap gap-2 pt-1">
-                  {suggestions.map((q) => (
-                    <button key={q} type="button" onClick={() => submit(q)} className={CHIP_CLASS}>
-                      {q}
-                    </button>
-                  ))}
-                </div>
+              {isFreshChat && introStep === 0 && (
+                <MessageBubble message={{ id: "intro-typing", role: "assistant", content: "" }} />
+              )}
+              {isFreshChat && introStep >= 1 && (
+                <MessageBubble message={{ id: "intro", role: "assistant", content: intro }} />
+              )}
+              {isFreshChat && introStep === 2 && (
+                <MessageBubble message={{ id: "demo-typing", role: "assistant", content: "" }} />
+              )}
+              {isFreshChat && introStep >= 3 && (
+                <MessageBubble
+                  message={{
+                    id: "demo-prompt",
+                    role: "assistant",
+                    content: DEMO_PROMPT_MESSAGE,
+                  }}
+                />
+              )}
+              {showStoredIntro && (
+                <>
+                  <MessageBubble
+                    message={{ id: "stored-intro", role: "assistant", content: intro }}
+                  />
+                  <MessageBubble
+                    message={{
+                      id: "stored-demo-prompt",
+                      role: "assistant",
+                      content: DEMO_PROMPT_MESSAGE,
+                    }}
+                  />
+                </>
               )}
 
               {messages.map((m, i) => (
@@ -268,6 +383,25 @@ export function TaelAgent({
                 />
               ))}
             </div>
+
+            {isFreshChat && introStep >= 3 && (
+              <div className="px-3 pt-2">
+                <div className="-mx-3 overflow-x-auto px-3 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="flex w-max gap-2">
+                    {suggestions.map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        onClick={() => submit(q)}
+                        className={`${CHIP_CLASS} whitespace-nowrap`}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Composer */}
             <form

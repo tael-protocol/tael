@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Inter, Delicious_Handrawn, DotGothic16 } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+import { TaelAgent } from "./_components/agent";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -124,6 +125,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <Providers>{children}</Providers>
+        <TaelAgent />
       </body>
     </html>
   );

@@ -1,145 +1,273 @@
 /* eslint-disable @next/next/no-img-element */
+import { DraggableCardScroll } from "./_components/draggable-card-scroll";
+import { MarketingFooter } from "./_components/marketing-footer";
+import { OpenAgentButton } from "./_components/open-agent-button";
 import { SiteHeader } from "./_components/site-header";
-import { ProviderCards } from "./_components/provider-cards";
-import { FooterLinks } from "./_components/footer-links";
-import { TaelAgent } from "./_components/agent";
+import { TrustedCarousel } from "./_components/trusted-carousel";
 
-// Pixel-anchored: dark upper region matches the original design, then a long,
-// smooth grey→white fade (410→740px, ~330px) so it blends gently into white
-// before the footer section begins.
-const HERO_GRADIENT =
-  "linear-gradient(180deg, #0A0A0A 0px, #000000 130px, #27272A 260px, #505158 410px, #FFFFFF 740px)";
-
-// Orbiting provider icons, positioned on the arc (coords relative to the 1440px stage).
-const ORBIT = [
-  {
-    src: "/logos/orbit-anthropic.svg",
-    w: 35,
-    h: 24,
-    size: 60,
-    left: 242,
-    top: 382,
-    alt: "Anthropic",
-  },
-  { src: "/logos/orbit-openai.svg", w: 33, h: 32, size: 62, left: 365, top: 240, alt: "OpenAI" },
-  { src: "/logos/orbit-claude.svg", w: 36, h: 36, size: 64, left: 686, top: 124, alt: "Claude" },
-  { src: "/logos/orbit-grok.svg", w: 36, h: 36, size: 64, left: 863, top: 156, alt: "Grok" },
-  {
-    src: "/logos/orbit-perplexity.png",
-    w: 50,
-    h: 50,
-    size: 62,
-    left: 1017,
-    top: 240,
-    alt: "Perplexity",
-  },
-  { src: "/logos/orbit-lovable.svg", w: 27, h: 28, size: 60, left: 1138, top: 382, alt: "Lovable" },
+const HERO_LOGOS = [
+  { label: "Solana", className: "bg-[#5CE1D8] text-[#10201F]" },
+  { label: "Blue", className: "bg-[#5166FF] text-white" },
+  { label: "Stellar", className: "bg-[#7387FF] text-white" },
+  { label: "Honey", className: "bg-[#F5B82E] text-[#241906]" },
+  { label: "Move", className: "bg-[#1178FF] text-white" },
+  { label: "Delta", className: "bg-[#EF4C4C] text-white" },
+  { label: "Arbitrum", className: "bg-[#5E7899] text-white" },
+  { label: "Orbit", className: "bg-[#7A63FF] text-white" },
+  { label: "Wave", className: "bg-[#43C8A7] text-[#06231D]" },
 ];
 
-const iconCircle =
-  "absolute flex items-center justify-center rounded-full border border-white/10 bg-white/20 backdrop-blur-[2.65px]";
+const DASHBOARD_URL = "https://mainnet.taelprotocol.xyz";
+
+const FEATURES = [
+  {
+    title: "Own your funds",
+    description:
+      "Your keys, your funds. The agent acts inside your own wallet and never holds a cent of your money.",
+    src: "/feature-own-funds.svg",
+    imageClass:
+      "left-1/2 top-1/2 h-[345px] w-[624px] -translate-x-[34%] -translate-y-1/2 -scale-y-100 lg:left-[-4px] lg:top-[-25px] lg:translate-x-0 lg:translate-y-0",
+  },
+  {
+    title: "Just ask, it acts",
+    description:
+      "No menus, no steps. Say what you want in plain English, and the agent does it for you.",
+    src: "/feature-just-ask-extracted.png",
+    imageClass: "left-1/2 top-1/2 h-[225px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[260px]",
+  },
+  {
+    title: "Access anywhere",
+    description:
+      "One setup, every channel. Your agent lives on your site, in Discord, in Telegram, and inside Claude and ChatGPT.",
+    src: "/feature-access-extracted.png",
+    imageClass: "left-1/2 top-1/2 h-[242px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[286px]",
+  },
+  {
+    title: "Safe by design",
+    description:
+      "You set the spending limits, and they're locked on-chain. Even a compromised agent can't go over them.",
+    src: "/feature-safe-extracted.png",
+    imageClass: "left-1/2 top-1/2 h-[214px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[240px]",
+  },
+  {
+    title: "Nothing hidden",
+    description:
+      "Every action is a real transaction on Stellar. You can check any of them, anytime.",
+    src: "/feature-hidden-extracted.png",
+    imageClass: "left-1/2 top-1/2 h-[224px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[260px]",
+  },
+  {
+    title: "Low, flat fee",
+    description: "A flat 0.07% on every transaction. No spreads, no surprises.",
+    src: "/feature-fee-extracted.png",
+    imageClass:
+      "left-1/2 top-[52%] h-[238px] w-auto -translate-x-1/2 -translate-y-1/2 sm:h-[270px]",
+  },
+];
+
+const KYC_STEPS = [
+  {
+    title: "Connect",
+    description: "Sign in with your Stellar wallet or a passkey. No email, no KYC.",
+    src: "/kyc-connect.svg",
+    imageClass:
+      "left-1/2 top-1/2 h-[345px] w-[624px] -translate-x-[51%] -translate-y-1/2 md:left-[-139px] md:top-[-13px] md:translate-x-0 md:translate-y-0",
+  },
+  {
+    title: "Fund",
+    description:
+      "Load USDC into your agent's wallet from any Stellar wallet. No minimums, fees are fractions of a cent.",
+    src: "/kyc-fund.svg",
+    imageClass:
+      "left-1/2 top-1/2 h-[345px] w-[624px] -translate-x-[45%] -translate-y-1/2 md:left-[-82px] md:top-[-25px] md:translate-x-0 md:translate-y-0",
+  },
+  {
+    title: "All set",
+    description:
+      "Tell your agent to pay, run a capability, or swap. It acts on-chain instantly. No code, no delays.",
+    src: "/kyc-trade.svg",
+    rotated: true,
+  },
+];
+
+function DummyLogo({ label, className }: { label: string; className: string }) {
+  return (
+    <div
+      aria-label={`${label} logo placeholder`}
+      className={`flex size-[30px] shrink-0 items-center justify-center rounded-[7px] ${className}`}
+    >
+      <span className="h-3.5 w-3.5 rounded-[4px] border-2 border-current opacity-90" />
+    </div>
+  );
+}
+
+function StepArtwork({
+  src,
+  imageClass,
+  rotated = false,
+}: {
+  src: string;
+  imageClass?: string;
+  rotated?: boolean;
+}) {
+  if (rotated) {
+    return (
+      <div className="absolute left-1/2 top-[106%] flex h-[736px] w-[407px] -translate-x-[49%] -translate-y-1/2 items-center justify-center md:left-[-15px] md:top-[-38px] md:translate-x-0 md:translate-y-0">
+        <div className="flex-none rotate-90">
+          <img src={src} alt="" aria-hidden="true" className="h-[407px] w-[736px] max-w-none" />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <img src={src} alt="" aria-hidden="true" className={`absolute max-w-none ${imageClass}`} />
+  );
+}
+
+function FeaturesSection() {
+  return (
+    <section className="relative -mt-px overflow-hidden bg-[#141415] pb-20 pt-24 md:min-h-[903px] md:pb-0 md:pt-[164px]">
+      <div className="mx-auto flex max-w-[1440px] flex-col">
+        <div className="flex flex-col items-center gap-4 px-6 text-center">
+          <h2 className="max-w-[600px] text-[28px] font-medium leading-[36px] tracking-[-2.44px] text-white md:text-[48px] md:leading-[60px] md:tracking-[-0.0508em]">
+            Don&apos;t choose between
+            <br />
+            freedom and experience.
+          </h2>
+          <p className="max-w-[650px] text-[14px] font-medium leading-5 tracking-normal text-[#B7B5BA]">
+            Your keys, Your funds. Trade over a million token with the experience of an exchange{" "}
+            <br className="hidden sm:block" />
+            the freedom of wallet.
+          </p>
+        </div>
+
+        <DraggableCardScroll className="mt-7 w-full overflow-visible md:mt-[72px] md:overflow-x-hidden md:overflow-y-hidden">
+          <div className="flex w-full flex-col gap-14 px-4 md:w-max md:flex-row md:gap-6 md:pl-[120px] md:pr-[120px]">
+            {FEATURES.map((feature) => (
+              <article
+                key={feature.title}
+                className="flex w-full shrink-0 flex-col gap-[23px] md:w-[400px]"
+              >
+                <div className="relative h-[276px] w-full overflow-hidden rounded-[24px] bg-[#1F1F20] sm:h-[320px]">
+                  <img
+                    src={feature.src}
+                    alt=""
+                    aria-hidden="true"
+                    className={`absolute max-w-none ${feature.imageClass}`}
+                  />
+                </div>
+                <div className="flex w-full flex-col gap-[9px] px-4">
+                  <h3 className="text-[20px] font-medium leading-[30px] tracking-normal text-white">
+                    {feature.title}
+                  </h3>
+                  <p className="text-[14px] font-normal leading-5 tracking-[-0.3px] text-[#B7B5BA]">
+                    {feature.description}
+                  </p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </DraggableCardScroll>
+      </div>
+    </section>
+  );
+}
+
+function KycSection() {
+  return (
+    <section
+      id="kyc"
+      className="relative -mt-px overflow-hidden bg-[#141415] pb-20 pt-20 md:pb-0 md:pt-[79px]"
+    >
+      <div className="mx-auto flex max-w-[1440px] flex-col items-center px-4 md:px-6">
+        <h2 className="text-center text-[36px] font-medium leading-[42px] tracking-[-0.035em] text-white md:text-[48px] md:leading-[60px] md:tracking-[-0.0508em]">
+          Jump right in,
+          <br />
+          no KYC required.
+        </h2>
+
+        <div className="mt-12 grid w-full max-w-[1200px] grid-cols-1 gap-14 md:mt-[72px] md:grid-cols-3 md:gap-6">
+          {KYC_STEPS.map((step) => (
+            <article key={step.title} className="flex w-full flex-col gap-6 md:w-[384px]">
+              <div className="relative h-[276px] w-full overflow-hidden rounded-[24px] bg-[#1F1F20] sm:h-[320px] md:w-[384px]">
+                <StepArtwork src={step.src} imageClass={step.imageClass} rotated={step.rotated} />
+              </div>
+              <div className="flex w-full flex-col gap-[9px] px-4">
+                <h3 className="text-[20px] font-medium leading-[30px] tracking-normal text-white">
+                  {step.title}
+                </h3>
+                <p className="text-[14px] font-normal leading-5 tracking-[-0.3px] text-[#B7B5BA]">
+                  {step.description}
+                </p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function TrustedSection() {
+  return (
+    <section className="relative -mt-px overflow-hidden bg-[#141415] pb-20 pt-24 md:min-h-[891px] md:pb-0 md:pt-[184px]">
+      <TrustedCarousel />
+    </section>
+  );
+}
 
 export default function HomePage() {
   return (
     <>
-      {/* Sticky nav (lifted to the page root so it stays pinned page-wide) */}
       <SiteHeader />
 
-      {/* Hero — dark gradient with orbiting provider icons. Pulled up under the
-          sticky nav so the gradient still spans the full 740px design height. */}
-      <section className="relative -mt-12 overflow-hidden" style={{ background: HERO_GRADIENT }}>
-        <div className="relative left-1/2 h-[760px] w-[1440px] -translate-x-1/2">
-          {/* concentric orbit rings */}
-          <div
-            className="pointer-events-none absolute rounded-full border border-white/[0.05]"
-            style={{ left: 193, top: 154, width: 1054, height: 1054 }}
-          />
-          <div
-            className="pointer-events-none absolute rounded-full border border-white/[0.03]"
-            style={{ left: 284, top: 286, width: 872, height: 872 }}
-          />
+      <section className="relative -mt-14 overflow-hidden bg-[#101010]">
+        <img
+          src="/hero-bg.svg"
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute left-1/2 top-0 h-[903px] w-[1440px] max-w-none -translate-x-1/2"
+        />
 
-          {/* vertical guide rails (start below the nav) */}
-          <div
-            className="pointer-events-none absolute h-full w-px bg-white/[0.09]"
-            style={{ left: 80, top: 48 }}
-          />
-          <div
-            className="pointer-events-none absolute h-full w-px bg-white/[0.09]"
-            style={{ left: 1360, top: 48 }}
-          />
-
-          {/* orbit icons */}
-          {ORBIT.map((o) => (
-            <div
-              key={o.alt}
-              className={iconCircle}
-              style={{ left: o.left, top: o.top, width: o.size, height: o.size }}
-            >
-              <img src={o.src} alt={o.alt} style={{ width: o.w, height: o.h }} />
-            </div>
-          ))}
-          {/* pause icon (two bars) */}
-          <div className={iconCircle} style={{ left: 518, top: 156, width: 64, height: 64 }}>
-            <div className="flex items-center gap-1.5">
-              <span className="w-[6.5px] rounded-[3px] bg-white" style={{ height: 26 }} />
-              <span className="w-[6.5px] rounded-[3px] bg-white" style={{ height: 26 }} />
-            </div>
+        <div className="relative mx-auto flex min-h-[720px] max-w-[1440px] flex-col items-center px-5 pt-[132px] text-center md:min-h-[903px] md:px-6 md:pt-[212px]">
+          <div className="flex max-w-full flex-wrap items-center justify-center gap-3 md:gap-5">
+            {HERO_LOGOS.map((logo) => (
+              <DummyLogo key={logo.label} label={logo.label} className={logo.className} />
+            ))}
           </div>
 
-          {/* Headline + subtext */}
-          <div className="absolute left-1/2 top-[283px] flex w-[485px] max-w-[calc(100vw-48px)] -translate-x-1/2 flex-col items-center gap-4 text-center">
-            <h1 className="text-[40px] font-normal leading-[1.15] tracking-[-0.026em] text-white sm:text-[46px] sm:leading-[53px]">
-              The payment layer.
-              <br />
-              For AI agents.
-            </h1>
-            <p className="max-w-[430px] text-[18px] font-normal leading-[26px] tracking-[-0.035em] text-white">
-              Pay per call for any API, tool, or model. In USDC, no subscriptions, no accounts.
-            </p>
-          </div>
-
-          {/* CTAs — the product is live, so link straight into it. */}
-          <div className="absolute left-1/2 top-[481px] flex max-w-[calc(100vw-48px)] -translate-x-1/2 flex-wrap items-center justify-center gap-3">
-            <a
-              href="https://mainnet.taelprotocol.xyz"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-[14px] bg-accent px-6 py-3.5 text-[15px] font-medium text-white shadow-[0_1px_2px_0_rgba(0,0,0,0.16)] transition-opacity hover:opacity-90"
-            >
-              Try on Mainnet
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M5 12h14M13 6l6 6-6 6"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </a>
-            <a
-              href="/docs"
-              className="inline-flex items-center rounded-[14px] border border-white/25 px-6 py-3.5 text-[15px] font-medium text-white transition-colors hover:bg-white/10"
-            >
-              Read the docs
-            </a>
+          <div className="mt-14 flex w-full max-w-[1100px] flex-col items-center gap-10 md:mt-16 md:gap-14">
+            <div className="flex w-full flex-col items-center gap-7 md:gap-9">
+              <h1 className="max-w-[1100px] text-[42px] font-medium leading-[46px] tracking-normal text-white sm:text-[56px] sm:leading-[1.08] lg:whitespace-nowrap lg:text-[64px]">
+                Stellar ecosystem for AI Agents
+              </h1>
+              <p className="max-w-[760px] text-[16px] font-medium leading-7 tracking-normal text-[#B7B5BA] sm:text-[20px] sm:leading-8">
+                The on-chain action layer for AI agents on Stellar. Say what you want, your agent
+                does it, non-custodial and Soroban secured.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <OpenAgentButton className="marketing-pressable marketing-muted-button flex h-12 w-[157px] items-center justify-center rounded-[28px] border border-[#565458] bg-[#3C3A3F] px-5 py-[13px] text-[15px] font-medium leading-5 tracking-normal whitespace-nowrap text-white">
+                Talk to an agent
+              </OpenAgentButton>
+              <a
+                href={DASHBOARD_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="marketing-pressable marketing-primary-button flex h-12 w-[148px] items-center justify-center rounded-[28px] bg-white px-5 text-[15px] font-medium leading-5 tracking-normal whitespace-nowrap text-black"
+              >
+                Connect Wallet
+              </a>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Providers + footer */}
-      <section className="bg-white pb-24 pt-6">
-        <div className="mx-auto flex max-w-[1160px] flex-col gap-16 px-6 lg:flex-row lg:items-start lg:justify-between lg:gap-12">
-          <FooterLinks />
-          <ProviderCards />
-        </div>
-      </section>
-
-      {/* Support agent — landing page only, and desktop only (hidden on phones). */}
-      <div className="hidden md:block">
-        <TaelAgent />
-      </div>
+      <FeaturesSection />
+      <KycSection />
+      <TrustedSection />
+      <MarketingFooter />
     </>
   );
 }

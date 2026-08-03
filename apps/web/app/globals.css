@@ -7,6 +7,184 @@ body {
   background-color: #ffffff;
 }
 
+.marketing-card-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  touch-action: pan-y;
+  user-select: none;
+}
+
+.marketing-card-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.marketing-card-scroll.is-dragging {
+  cursor: grabbing;
+}
+
+.marketing-card-scroll * {
+  user-select: none;
+}
+
+.testimonial-post-text {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: pre-line;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 12;
+}
+
+@media (min-width: 768px) {
+  .testimonial-post-text {
+    -webkit-line-clamp: 6;
+  }
+}
+
+.marketing-pressable {
+  transform: translateZ(0);
+  transition-property: transform, background-color, border-color, color;
+  transition-duration: 180ms;
+  transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.marketing-pressable:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.68);
+  outline-offset: 3px;
+}
+
+.marketing-pressable:disabled {
+  cursor: default;
+  opacity: 0.86;
+  transform: translateZ(0);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .marketing-primary-button:hover:not(:disabled) {
+    background-color: #f7f7f7;
+  }
+
+  .marketing-muted-button:hover:not(:disabled) {
+    border-color: transparent;
+    background-color: #d8d8d8;
+    color: #141415;
+  }
+
+  .marketing-nav-link:hover:not(:disabled),
+  .marketing-footer-link:hover:not(:disabled) {
+    background-color: #29292b;
+  }
+
+  .marketing-social-button:hover:not(:disabled) {
+    background-color: #343436;
+    color: #ffffff;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marketing-pressable {
+    transition-property: background-color, border-color, color;
+  }
+
+  .marketing-pressable:hover {
+    transform: translateZ(0);
+  }
+}
+
+.email-shard {
+  animation-duration: 520ms;
+  animation-fill-mode: forwards;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: opacity, transform;
+}
+
+.email-shard-one {
+  animation-name: email-shatter-one;
+  clip-path: polygon(0 0, 100% 0, 100% 30%, 0 42%);
+}
+
+.email-shard-two {
+  animation-name: email-shatter-two;
+  clip-path: polygon(0 28%, 100% 20%, 100% 54%, 0 62%);
+}
+
+.email-shard-three {
+  animation-name: email-shatter-three;
+  clip-path: polygon(0 54%, 100% 44%, 100% 74%, 0 82%);
+}
+
+.email-shard-four {
+  animation-name: email-shatter-four;
+  clip-path: polygon(0 72%, 100% 62%, 100% 100%, 0 100%);
+}
+
+.thank-you-reveal {
+  animation: thank-you-reveal 380ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  backface-visibility: hidden;
+  will-change: opacity, transform;
+}
+
+@keyframes email-shatter-one {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(-22px, -28px, 0) rotate(-4deg) scale(0.98);
+  }
+}
+
+@keyframes email-shatter-two {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(28px, -13px, 0) rotate(3deg) scale(0.98);
+  }
+}
+
+@keyframes email-shatter-three {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(-18px, 15px, 0) rotate(3deg) scale(0.98);
+  }
+}
+
+@keyframes email-shatter-four {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translate3d(24px, 30px, 0) rotate(-3deg) scale(0.98);
+  }
+}
+
+@keyframes thank-you-reveal {
+  0% {
+    opacity: 0;
+    transform: translate3d(16px, 10px, 0) scale(0.98);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
 /* Syntax highlighting (sugar-high) — light palette, Vercel-style colors. */
 :root {
   --sh-class: #1f6feb;

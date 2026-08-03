@@ -106,7 +106,7 @@ function AvailableTable({ capabilities }: { capabilities: Capability[] }) {
           <TableRow key={c.slug}>
             <TableCell>
               <a
-                href={`https://app.taelprotocol.xyz/marketplace/${c.slug}`}
+                href={`https://mainnet.taelprotocol.xyz/marketplace/${c.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="group inline-flex items-center gap-2 font-medium text-white"

@@ -14,17 +14,19 @@ export const AGENT_NAME = "Tael";
 export const AGENT_TAGLINE = "Ask anything about Tael";
 
 /** Bold greeting line, shown in the proactive teaser and the first bubble. */
-export const GREETING = "Hi there 👋";
+export const GREETING = "Hi there";
 /** The body under the greeting. */
 export const INTRO_BODY = "Great to see you here. What would you like me to help you with?";
 /** The first thing the agent says when the panel opens (greeting + body). */
-export const INTRO_MESSAGE = `${GREETING}\n${INTRO_BODY}`;
+export const INTRO_MESSAGE = "You are talking to Tael agent.";
+/** Follow-up shown as the second assistant bubble when the panel opens. */
+export const DEMO_PROMPT_MESSAGE = "How can I help you?";
 
 /** One-tap prompts shown under the intro to get people started. */
 export const SUGGESTED_QUESTIONS = [
   "What is Tael?",
-  "How can I publish my capabilities?",
-  "How do I make a card or API key to access capabilities?",
+  "How do I publish a capability?",
+  "How do agents pay for a call?",
   "Book a meeting",
 ];
 
@@ -49,7 +51,7 @@ Capabilities come in two flavours:
 Everything settles as real USDC on Stellar, per call, tagged with a "tael" memo so payments are attributable on-chain. Payment, payout, and fee happen atomically in one transaction.
 
 # Getting started
-- Use capabilities: sign in to the dashboard at app.taelprotocol.xyz, create a Card, fund it with USDC, set its spending caps, then browse the marketplace and call any capability.
+- Use capabilities: sign in to the dashboard at mainnet.taelprotocol.xyz, create a Card, fund it with USDC, set its spending caps, then browse the marketplace and call any capability.
 - Publish a capability: wrap your API (or MCP tool, model, or dataset) with the Tael SDK and publish it to the marketplace. Full steps are in the "Become a capability" guide in the docs.
 - Docs live at taelprotocol.xyz/docs (quickstart, call a capability, wrap an API, become a capability, authentication, SDK). There's a blog at taelprotocol.xyz/blog.
 
