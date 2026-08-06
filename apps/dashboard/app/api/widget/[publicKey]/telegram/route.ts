@@ -85,7 +85,8 @@ export async function POST(request: Request, context: { params: Promise<{ public
   const settings = (product.settings as Record<string, unknown>) ?? {};
   const token = typeof settings.telegramBotToken === "string" ? settings.telegramBotToken : null;
   const enabled = settings.telegramBotEnabled !== false;
-  const secretToken = typeof settings.telegramSecretToken === "string" ? settings.telegramSecretToken : null;
+  const secretToken =
+    typeof settings.telegramSecretToken === "string" ? settings.telegramSecretToken : null;
 
   if (!token || !enabled) {
     return new Response("Telegram bot is not configured or disabled for this agent.", {
@@ -138,12 +139,7 @@ export async function POST(request: Request, context: { params: Promise<{ public
 
     const check = await getEnabledActionForPublicKey(publicKey, actionId);
     if (!check.ok) {
-      await editTelegramMessageText(
-        token,
-        chatId,
-        messageId,
-        `❌ Action failed: ${check.error}`,
-      );
+      await editTelegramMessageText(token, chatId, messageId, `❌ Action failed: ${check.error}`);
       return new Response("OK", { status: 200 });
     }
 
@@ -241,11 +237,7 @@ export async function POST(request: Request, context: { params: Promise<{ public
       const data = (await resp.json()) as OpenRouterResponse;
       const message = data.choices?.[0]?.message;
       if (!message) {
-        await sendTelegramMessage(
-          token,
-          chatId,
-          "No response received from the agent.",
-        );
+        await sendTelegramMessage(token, chatId, "No response received from the agent.");
         return new Response("OK", { status: 200 });
       }
 
@@ -302,11 +294,7 @@ export async function POST(request: Request, context: { params: Promise<{ public
     );
     return new Response("OK", { status: 200 });
   } catch {
-    await sendTelegramMessage(
-      token,
-      chatId,
-      "An error occurred while processing your request.",
-    );
+    await sendTelegramMessage(token, chatId, "An error occurred while processing your request.");
     return new Response("OK", { status: 200 });
   }
 }

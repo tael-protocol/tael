@@ -109,7 +109,9 @@ export async function setTelegramWebhook(
 }
 
 /** Delete webhook for Telegram bot. */
-export async function deleteTelegramWebhook(token: string): Promise<{ ok: boolean; error?: string }> {
+export async function deleteTelegramWebhook(
+  token: string,
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const res = await fetch(`${TELEGRAM_API_BASE}/bot${token}/deleteWebhook`, {
       method: "POST",

@@ -16,7 +16,8 @@ export function DeployPanel({ product }: { product: Product }) {
   );
 
   const settings = (product.settings as Record<string, unknown>) ?? {};
-  const currentBotUsername = typeof settings.telegramBotUsername === "string" ? settings.telegramBotUsername : "";
+  const currentBotUsername =
+    typeof settings.telegramBotUsername === "string" ? settings.telegramBotUsername : "";
   const isTelegramEnabled = settings.telegramBotEnabled === true;
 
   const [telegramToken, setTelegramToken] = useState("");
@@ -50,7 +51,11 @@ export function DeployPanel({ product }: { product: Product }) {
     setTelegramError(null);
     setTelegramSuccess(null);
     startTransition(async () => {
-      const res = await connectTelegramBot(product.id, telegramToken, base || window.location.origin);
+      const res = await connectTelegramBot(
+        product.id,
+        telegramToken,
+        base || window.location.origin,
+      );
       if (res.ok) {
         setTelegramSuccess(`Connected successfully as @${res.botUsername ?? "bot"}`);
         router.refresh();
@@ -140,7 +145,8 @@ export function DeployPanel({ product }: { product: Product }) {
         <div>
           <h2 className="text-base font-semibold">Telegram Bot Integration</h2>
           <p className="text-sm text-muted-foreground">
-            Connect a Telegram Bot token to serve your product agent on Telegram. Train once, serve everywhere.
+            Connect a Telegram Bot token to serve your product agent on Telegram. Train once, serve
+            everywhere.
           </p>
         </div>
 
@@ -153,7 +159,9 @@ export function DeployPanel({ product }: { product: Product }) {
                 </span>
                 <div>
                   <p className="text-sm font-medium">Connected as @{currentBotUsername}</p>
-                  <p className="text-xs text-muted-foreground">Webhook active and listening for messages.</p>
+                  <p className="text-xs text-muted-foreground">
+                    Webhook active and listening for messages.
+                  </p>
                 </div>
               </div>
               <Button
@@ -203,7 +211,8 @@ export function DeployPanel({ product }: { product: Product }) {
         <div>
           <h2 className="text-base font-semibold">Channels</h2>
           <p className="text-sm text-muted-foreground">
-            Where this agent can show up. Website and Telegram are ready; more channels are on the way.
+            Where this agent can show up. Website and Telegram are ready; more channels are on the
+            way.
           </p>
         </div>
 
@@ -262,4 +271,3 @@ export function DeployPanel({ product }: { product: Product }) {
     </div>
   );
 }
-

@@ -107,10 +107,7 @@ export async function connectTelegramBot(
     telegramSecretToken: secretToken,
   };
 
-  await db
-    .update(products)
-    .set({ settings: updatedSettings })
-    .where(eq(products.id, id));
+  await db.update(products).set({ settings: updatedSettings }).where(eq(products.id, id));
 
   revalidateStudioPaths();
   return { ok: true, botUsername: info.username };
@@ -130,7 +127,8 @@ export async function disconnectTelegramBot(id: string): Promise<ActionResult> {
   if (!product) return { ok: false, error: "Agent not found." };
 
   const currentSettings = (product.settings as Record<string, unknown>) ?? {};
-  const token = typeof currentSettings.telegramBotToken === "string" ? currentSettings.telegramBotToken : null;
+  const token =
+    typeof currentSettings.telegramBotToken === "string" ? currentSettings.telegramBotToken : null;
 
   if (token) {
     const { deleteTelegramWebhook } = await import("./telegram");
@@ -142,10 +140,7 @@ export async function disconnectTelegramBot(id: string): Promise<ActionResult> {
     telegramBotEnabled: false,
   };
 
-  await db
-    .update(products)
-    .set({ settings: updatedSettings })
-    .where(eq(products.id, id));
+  await db.update(products).set({ settings: updatedSettings }).where(eq(products.id, id));
 
   revalidateStudioPaths();
   return { ok: true };
@@ -170,4 +165,3 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
     return { ok: false, error: "Could not delete. Try again." };
   }
 }
-
