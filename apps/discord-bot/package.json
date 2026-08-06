@@ -1,0 +1,28 @@
+{
+  "name": "discord-bot",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Tael Discord bot: call marketplace capabilities from Discord, paid per call in USDC.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "build": "tsup src/index.ts --format esm --target node22 --clean",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo"
+  },
+  "dependencies": {
+    "@tael/sdk": "workspace:*",
+    "discord.js": "^14.16.3"
+  },
+  "devDependencies": {
+    "@tael/config": "workspace:*",
+    "@types/node": "catalog:",
+    "tsup": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:"
+  }
+}
