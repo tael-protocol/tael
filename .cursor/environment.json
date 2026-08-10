@@ -1,0 +1,20 @@
+{
+  "name": "Tael",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "api",
+      "command": "pnpm --filter @tael/api dev"
+    },
+    {
+      "name": "web",
+      "command": "pnpm --filter web dev"
+    },
+    {
+      "name": "dashboard",
+      "command": "pnpm --filter dashboard dev"
+    }
+  ],
+  "ports": [3000, 3001, 3002]
+}
