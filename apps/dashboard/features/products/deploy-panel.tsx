@@ -6,6 +6,7 @@ import { Check, Copy, Globe, MessageCircle, Radio, Server, Bot, Unplug } from "l
 import { Button, Input, cn } from "@tael/ui";
 import type { Product } from "@tael/database";
 import { connectTelegramBot, disconnectTelegramBot } from "./actions";
+import { DiscordConnectPanel } from "./discord-connect-panel";
 
 export function DeployPanel({ product }: { product: Product }) {
   const router = useRouter();
@@ -19,6 +20,7 @@ export function DeployPanel({ product }: { product: Product }) {
   const currentBotUsername =
     typeof settings.telegramBotUsername === "string" ? settings.telegramBotUsername : "";
   const isTelegramEnabled = settings.telegramBotEnabled === true;
+  const isDiscordEnabled = settings.discordBotEnabled === true;
 
   const [telegramToken, setTelegramToken] = useState("");
   const [telegramError, setTelegramError] = useState<string | null>(null);
@@ -98,9 +100,9 @@ export function DeployPanel({ product }: { product: Product }) {
     {
       id: "discord",
       label: "Discord",
-      description: "Answer in your Discord server.",
+      description: "Answer product questions with /ask in your server.",
       icon: MessageCircle,
-      status: "soon" as const,
+      status: isDiscordEnabled ? ("live" as const) : ("ready" as const),
     },
     {
       id: "mcp",
@@ -207,11 +209,18 @@ export function DeployPanel({ product }: { product: Product }) {
         ) : null}
       </section>
 
+      <DiscordConnectPanel
+        product={product}
+        baseUrl={base}
+        pending={pending}
+        startTransition={startTransition}
+      />
+
       <section className="space-y-4 rounded-xl border p-5">
         <div>
           <h2 className="text-base font-semibold">Channels</h2>
           <p className="text-sm text-muted-foreground">
-            Where this agent can show up. Website and Telegram are ready; more channels are on the
+            Where this agent can show up. Website, Telegram, and Discord are ready; MCP is on the
             way.
           </p>
         </div>
