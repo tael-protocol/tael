@@ -1,0 +1,130 @@
+import { after } from "next/server";
+import { getProductByPublicKey } from "../../../../../features/products/queries";
+import {
+  DISCORD_CALLBACK_DEFERRED_CHANNEL_MESSAGE,
+  DISCORD_CALLBACK_PONG,
+  DISCORD_INTERACTION_APPLICATION_COMMAND,
+  DISCORD_INTERACTION_MESSAGE_COMPONENT,
+  DISCORD_INTERACTION_PING,
+  getDiscordOptionString,
+  verifyDiscordRequest,
+  type DiscordInteraction,
+} from "../../../../../features/products/discord";
+import {
+  handleDiscordActionConfirm,
+  handleDiscordAsk,
+} from "../../../../../features/products/discord-chat";
+import { createRateLimiter } from "../../../../../features/products/widget-chat";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
+const allowRequest = createRateLimiter(30, 60_000);
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}
+
+export async function POST(request: Request, context: { params: Promise<{ publicKey: string }> }) {
+  const { publicKey: rawKey } = await context.params;
+  const publicKey = decodeURIComponent(rawKey ?? "").trim();
+  if (!publicKey) return new Response("Missing public key.", { status: 400 });
+
+  const product = await getProductByPublicKey(publicKey);
+  if (!product) return new Response("Agent not found.", { status: 404 });
+
+  const settings = (product.settings as Record<string, unknown>) ?? {};
+  const enabled = settings.discordBotEnabled !== false;
+  const discordPublicKey =
+    typeof settings.discordPublicKey === "string" ? settings.discordPublicKey : null;
+  const applicationId =
+    typeof settings.discordClientId === "string" ? settings.discordClientId : null;
+
+  if (!discordPublicKey || !enabled) {
+    return new Response("Discord bot is not configured or disabled for this agent.", {
+      status: 400,
+    });
+  }
+
+  const signature = request.headers.get("x-signature-ed25519");
+  const timestamp = request.headers.get("x-signature-timestamp");
+  const rawBody = await request.text();
+
+  if (
+    !signature ||
+    !timestamp ||
+    !verifyDiscordRequest(discordPublicKey, signature, timestamp, rawBody)
+  ) {
+    return new Response("Invalid request signature.", { status: 401 });
+  }
+
+  let interaction: DiscordInteraction;
+  try {
+    interaction = JSON.parse(rawBody) as DiscordInteraction;
+  } catch {
+    return new Response("Invalid payload.", { status: 400 });
+  }
+
+  if (interaction.type === DISCORD_INTERACTION_PING) {
+    return jsonResponse({ type: DISCORD_CALLBACK_PONG });
+  }
+
+  if (!applicationId) {
+    return jsonResponse({
+      type: 4,
+      data: { content: "Discord bot is missing its Application ID. Reconnect in Tael Studio." },
+    });
+  }
+
+  if (interaction.type === DISCORD_INTERACTION_MESSAGE_COMPONENT) {
+    const customId = interaction.data?.custom_id ?? "";
+    if (!customId.startsWith("run:")) {
+      return jsonResponse({
+        type: 4,
+        data: { content: "Unknown button.", flags: 64 },
+      });
+    }
+
+    const parts = customId.split(":");
+    const actionId = parts[1] ?? "";
+    const paramsStr = parts.slice(2).join(":");
+
+    after(() =>
+      handleDiscordActionConfirm(publicKey, applicationId, interaction.token, actionId, paramsStr),
+    );
+    return jsonResponse({ type: DISCORD_CALLBACK_DEFERRED_CHANNEL_MESSAGE });
+  }
+
+  if (interaction.type === DISCORD_INTERACTION_APPLICATION_COMMAND) {
+    if (interaction.data?.name !== "ask") {
+      return jsonResponse({
+        type: 4,
+        data: { content: "Unknown command.", flags: 64 },
+      });
+    }
+
+    const question = getDiscordOptionString(interaction, "question")?.trim() ?? "";
+    if (!question) {
+      return jsonResponse({
+        type: 4,
+        data: { content: "Please include a question.", flags: 64 },
+      });
+    }
+
+    const userId = interaction.member?.user?.id ?? interaction.user?.id ?? "anon";
+    if (!allowRequest(`${publicKey}:${userId}`)) {
+      return jsonResponse({
+        type: 4,
+        data: { content: "Too many requests. Please wait a minute.", flags: 64 },
+      });
+    }
+
+    after(() => handleDiscordAsk(product, applicationId, interaction.token, question));
+    return jsonResponse({ type: DISCORD_CALLBACK_DEFERRED_CHANNEL_MESSAGE });
+  }
+
+  return jsonResponse({ type: 4, data: { content: "Unsupported interaction.", flags: 64 } });
+}

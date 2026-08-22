@@ -146,6 +146,125 @@ export async function disconnectTelegramBot(id: string): Promise<ActionResult> {
   return { ok: true };
 }
 
+const discordPublicKeySchema = z
+  .string()
+  .trim()
+  .regex(/^[0-9a-fA-F]{64}$/, "Application Public Key must be 64 hex characters.");
+
+const discordClientIdSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{17,20}$/, "Application ID / Client ID looks invalid.");
+
+/**
+ * Connect a Discord bot to this product agent.
+ * Unlike Telegram, Discord Interactions Endpoint URL must be pasted in the Developer Portal.
+ */
+export async function connectDiscordBot(
+  id: string,
+  botToken: string,
+  publicKey: string,
+  clientId: string,
+  baseUrl: string,
+): Promise<ActionResult & { botUsername?: string; interactionsUrl?: string; inviteUrl?: string }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const cleanToken = botToken.trim();
+  if (!cleanToken) return { ok: false, error: "Discord Bot Token is required." };
+
+  const parsedKey = discordPublicKeySchema.safeParse(publicKey);
+  if (!parsedKey.success) {
+    return { ok: false, error: parsedKey.error.issues[0]?.message ?? "Invalid public key." };
+  }
+
+  const parsedClientId = discordClientIdSchema.safeParse(clientId);
+  if (!parsedClientId.success) {
+    return { ok: false, error: parsedClientId.error.issues[0]?.message ?? "Invalid client id." };
+  }
+
+  const [product] = await db
+    .select()
+    .from(products)
+    .where(and(eq(products.id, id), eq(products.ownerId, user.id)))
+    .limit(1);
+
+  if (!product) return { ok: false, error: "Agent not found." };
+
+  const { getDiscordBotInfo, registerDiscordAskCommand, buildDiscordInviteUrl } =
+    await import("./discord");
+
+  const info = await getDiscordBotInfo(cleanToken);
+  if (!info.ok || !info.username) {
+    return { ok: false, error: info.error ?? "Invalid Discord bot token." };
+  }
+
+  const applicationId = parsedClientId.data;
+  const cmdResult = await registerDiscordAskCommand(cleanToken, applicationId);
+  if (!cmdResult.ok) {
+    return { ok: false, error: cmdResult.error ?? "Could not register /ask command." };
+  }
+
+  const interactionsUrl = `${baseUrl.replace(/\/$/, "")}/api/widget/${encodeURIComponent(product.publicKey)}/discord`;
+  const inviteUrl = buildDiscordInviteUrl(applicationId);
+
+  const currentSettings = (product.settings as Record<string, unknown>) ?? {};
+  const updatedSettings = {
+    ...currentSettings,
+    discordBotToken: cleanToken,
+    discordPublicKey: parsedKey.data.toLowerCase(),
+    discordClientId: applicationId,
+    discordBotUsername: info.username,
+    discordBotUserId: info.id,
+    discordBotEnabled: true,
+  };
+
+  await db.update(products).set({ settings: updatedSettings }).where(eq(products.id, id));
+
+  revalidateStudioPaths();
+  return {
+    ok: true,
+    botUsername: info.username,
+    interactionsUrl,
+    inviteUrl,
+  };
+}
+
+/** Disconnect / Disable Discord Bot for this product agent. Ownership-checked. */
+export async function disconnectDiscordBot(id: string): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, error: "Not signed in." };
+
+  const [product] = await db
+    .select()
+    .from(products)
+    .where(and(eq(products.id, id), eq(products.ownerId, user.id)))
+    .limit(1);
+
+  if (!product) return { ok: false, error: "Agent not found." };
+
+  const currentSettings = (product.settings as Record<string, unknown>) ?? {};
+  const token =
+    typeof currentSettings.discordBotToken === "string" ? currentSettings.discordBotToken : null;
+  const clientId =
+    typeof currentSettings.discordClientId === "string" ? currentSettings.discordClientId : null;
+
+  if (token && clientId) {
+    const { deleteDiscordAskCommand } = await import("./discord");
+    await deleteDiscordAskCommand(token, clientId);
+  }
+
+  const updatedSettings = {
+    ...currentSettings,
+    discordBotEnabled: false,
+  };
+
+  await db.update(products).set({ settings: updatedSettings }).where(eq(products.id, id));
+
+  revalidateStudioPaths();
+  return { ok: true };
+}
+
 /** Delete a product the signed-in user owns. Cascades content + actions. */
 export async function deleteProduct(id: string): Promise<ActionResult> {
   const user = await getCurrentUser();
