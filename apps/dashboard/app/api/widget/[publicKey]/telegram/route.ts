@@ -20,12 +20,11 @@ import {
   createRateLimiter,
   proposeWidgetAction,
 } from "../../../../../features/products/widget-chat";
+import { createLlmChatCompletion, getLlmConfig } from "../../../../../lib/llm";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
 const MAX_TOKENS = 700;
 const MAX_TOOL_HOPS = 3;
 
@@ -102,9 +101,9 @@ export async function POST(request: Request, context: { params: Promise<{ public
     }
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
-    return new Response("OpenRouter key not configured.", { status: 503 });
+  const llm = getLlmConfig();
+  if (!llm) {
+    return new Response("Model key not configured.", { status: 503 });
   }
 
   const update = (await request.json().catch(() => null)) as TelegramUpdate | null;
@@ -208,21 +207,11 @@ export async function POST(request: Request, context: { params: Promise<{ public
 
   try {
     for (let hop = 0; hop < MAX_TOOL_HOPS; hop += 1) {
-      const resp = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          "content-type": "application/json",
-          "HTTP-Referer": "https://taelprotocol.xyz",
-          "X-Title": "Tael Telegram Agent",
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: convo,
-          ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
-          max_tokens: MAX_TOKENS,
-          temperature: 0.3,
-        }),
+      const resp = await createLlmChatCompletion(llm, {
+        messages: convo,
+        tools: tools.length > 0 ? tools : undefined,
+        maxTokens: MAX_TOKENS,
+        title: "Tael Telegram Agent",
       });
 
       if (!resp.ok) {

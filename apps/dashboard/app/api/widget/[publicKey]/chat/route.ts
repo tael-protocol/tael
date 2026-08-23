@@ -11,16 +11,15 @@ import {
   proposeWidgetAction,
   type ProposedWidgetAction,
 } from "../../../../../features/products/widget-chat";
+import { createLlmChatCompletion, getLlmConfig } from "../../../../../lib/llm";
 
 // Public per-product widget chat. Answers from that product's enabled content
 // and can PROPOSE enabled actions (confirm-gated; never runs them here).
 // No auth: the publicKey is the Stripe-style publishable key. Node runtime for
-// the OpenRouter key; room for a short tool loop.
+// the Gemini/OpenRouter key; room for a short tool loop.
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
 const MAX_TOKENS = 700;
 const MAX_MESSAGES = 20;
 const MAX_TOOL_HOPS = 3;
@@ -106,8 +105,8 @@ export async function POST(request: Request, context: { params: Promise<{ public
     return json({ error: "Too many requests. Try again in a minute." }, 429);
   }
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey) {
+  const llm = getLlmConfig();
+  if (!llm) {
     return json({ error: "The agent is not configured yet." }, 503);
   }
 
@@ -150,21 +149,11 @@ export async function POST(request: Request, context: { params: Promise<{ public
 
   try {
     for (let hop = 0; hop < MAX_TOOL_HOPS; hop += 1) {
-      const resp = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          "content-type": "application/json",
-          "HTTP-Referer": "https://taelprotocol.xyz",
-          "X-Title": "Tael Widget Agent",
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: convo,
-          ...(tools.length > 0 ? { tools, tool_choice: "auto" } : {}),
-          max_tokens: MAX_TOKENS,
-          temperature: 0.3,
-        }),
+      const resp = await createLlmChatCompletion(llm, {
+        messages: convo,
+        tools: tools.length > 0 ? tools : undefined,
+        maxTokens: MAX_TOKENS,
+        title: "Tael Widget Agent",
       });
 
       if (!resp.ok) {

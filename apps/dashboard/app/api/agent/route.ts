@@ -8,20 +8,19 @@ import {
 } from "../../../features/capabilities/queries";
 import { getPaymentsData } from "../../../features/payments/queries";
 import { getWalletOverview } from "../../../features/wallet/queries";
+import { createLlmChatCompletion, getLlmConfig } from "../../../lib/llm";
 
 // The dashboard's Tael copilot. It runs a tool loop over the same server queries
 // the pages use (scoped to the signed-in user's session), so it answers with the
 // account's real, live data. It can also PROPOSE running a capability — that
 // never runs on its own; it returns a confirmation the user approves before a
-// card pays. Talks to OpenRouter (default Gemini 2.5 Flash, swappable). Node
-// runtime: reads a server-only key and touches server-only queries.
+// card pays. Talks to Gemini direct (with OpenRouter fallback). Node runtime:
+// reads a server-only key and touches server-only queries.
 export const runtime = "nodejs";
 // The tool loop makes several model calls; give it room so multi-step asks
 // (e.g. "run the TrustLine capability") don't hit the default function timeout.
 export const maxDuration = 60;
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const MODEL = process.env.OPENROUTER_MODEL ?? "google/gemini-2.5-flash";
 const MAX_TOKENS = 700;
 // Cap the tool loop so a confused model can never spin forever.
 const MAX_TOOL_HOPS = 5;
@@ -395,9 +394,8 @@ interface AgentRequestBody {
 }
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey)
-    return jsonError("The agent isn't configured yet (missing OPENROUTER_API_KEY).", 503);
+  const llm = getLlmConfig();
+  if (!llm) return jsonError("The agent isn't configured yet (missing GEMINI_API_KEY).", 503);
 
   const body = (await request.json().catch(() => null)) as AgentRequestBody | null;
   const messages = body?.messages;
@@ -431,26 +429,16 @@ export async function POST(request: Request) {
   for (let hop = 0; hop < MAX_TOOL_HOPS; hop += 1) {
     let data: OpenRouterResponse;
     try {
-      const resp = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        headers: {
-          authorization: `Bearer ${apiKey}`,
-          "content-type": "application/json",
-          "HTTP-Referer": "https://taelprotocol.xyz",
-          "X-Title": "Tael Agent",
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: convo,
-          tools: TOOLS,
-          tool_choice: "auto",
-          max_tokens: MAX_TOKENS,
-          temperature: 0.3,
-        }),
+      const resp = await createLlmChatCompletion(llm, {
+        messages: convo,
+        tools: TOOLS,
+        maxTokens: MAX_TOKENS,
+        title: "Tael Agent",
       });
       if (!resp.ok) {
         console.error(
-          "[copilot] openrouter error:",
+          "[copilot] llm error:",
+          llm.provider,
           resp.status,
           await resp.text().catch(() => ""),
         );
@@ -458,7 +446,7 @@ export async function POST(request: Request) {
       }
       data = (await resp.json()) as OpenRouterResponse;
     } catch (error) {
-      console.error("[copilot] openrouter request failed:", error);
+      console.error("[copilot] llm request failed:", error);
       return reply("Sorry, something went wrong on my end. Please try again.");
     }
 
