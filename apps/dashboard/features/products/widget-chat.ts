@@ -161,8 +161,9 @@ export function buildWidgetSystemPrompt(
     `You are the on-site assistant for ${product.name}.`,
     description ? `About this product: ${description}` : null,
     greeting
-      ? `When starting a conversation, you may greet users in this spirit: "${greeting}"`
+      ? `Opening greeting (use ONLY on the very first reply in a new conversation, or when the user says /start). Do not repeat it on later messages. Spirit: "${greeting}"`
       : null,
+    "Never start a reply with a canned greeting like \"How can I help you?\" unless this is the first message and that phrase is the configured opening greeting.",
     "",
     "Answer using only the product knowledge below. If the answer is not in that knowledge, say you do not know based on the information you have. Do not invent facts, prices, or policies. Keep replies concise and helpful.",
     "",
