@@ -4,6 +4,8 @@
   "globalDependencies": ["**/.env", "tsconfig.json"],
   "globalEnv": [
     "NODE_ENV",
+    "GEMINI_API_KEY",
+    "GEMINI_MODEL",
     "OPENROUTER_API_KEY",
     "OPENROUTER_MODEL",
     "RESEND_API_KEY",
