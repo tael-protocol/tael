@@ -3,13 +3,9 @@ import {
   getProductByPublicKey,
   getProductContentForChat,
 } from "../../../../../features/products/queries";
+import { handleTelegramActionCallback } from "../../../../../features/products/telegram-action-callback";
+import { handleTelegramWalletCommands } from "../../../../../features/products/telegram-wallet-commands";
 import {
-  getEnabledActionForPublicKey,
-  runProductAction,
-} from "../../../../../features/products/run-product-action";
-import {
-  answerTelegramCallbackQuery,
-  editTelegramMessageText,
   sendTelegramMessage,
   type TelegramUpdate,
 } from "../../../../../features/products/telegram";
@@ -59,18 +55,12 @@ function safeParseArgs(raw: string | undefined): Record<string, unknown> {
 
 /** Formats a compact callback_data string under Telegram's strict 64-byte limit. */
 function buildCallbackData(actionId: string, paramsStr: string): string {
-  const hex = actionId.replace(/-/g, ""); // 32 chars
-  const prefix = `a:${hex}`; // 34 chars
+  const hex = actionId.replace(/-/g, "");
+  const prefix = `a:${hex}`;
   if (!paramsStr) return prefix;
-  const maxParamsLen = 63 - prefix.length - 1; // 28 chars max
+  const maxParamsLen = 63 - prefix.length - 1;
   const safeParams = paramsStr.slice(0, Math.max(0, maxParamsLen));
   return `${prefix}:${safeParams}`;
-}
-
-/** Reconstructs UUID from 32-hex actionId in callback_data. */
-function parseCallbackActionId(rawHex: string): string {
-  if (rawHex.length !== 32) return rawHex;
-  return `${rawHex.slice(0, 8)}-${rawHex.slice(8, 12)}-${rawHex.slice(12, 16)}-${rawHex.slice(16, 20)}-${rawHex.slice(20)}`;
 }
 
 export async function POST(request: Request, context: { params: Promise<{ publicKey: string }> }) {
@@ -93,7 +83,6 @@ export async function POST(request: Request, context: { params: Promise<{ public
     });
   }
 
-  // Webhook security: verify secret_token if configured
   if (secretToken) {
     const incomingSecret = request.headers.get("x-telegram-bot-api-secret-token");
     if (incomingSecret !== secretToken) {
@@ -102,82 +91,23 @@ export async function POST(request: Request, context: { params: Promise<{ public
   }
 
   const llm = getLlmConfig();
-  if (!llm) {
-    return new Response("Model key not configured.", { status: 503 });
-  }
-
   const update = (await request.json().catch(() => null)) as TelegramUpdate | null;
   if (!update) return new Response("Invalid payload", { status: 400 });
 
-  // Handle Telegram Callback Query (Action Confirmation Button Click)
+  const dashboardBase = (
+    process.env.NEXT_PUBLIC_DASHBOARD_URL ?? new URL(request.url).origin
+  ).replace(/\/$/, "");
+
   if (update.callback_query) {
-    const cb = update.callback_query;
-    const data = cb.data ?? "";
-    const chatId = cb.message?.chat.id;
-    const messageId = cb.message?.message_id;
-
-    if ((!data.startsWith("a:") && !data.startsWith("run_action:")) || !chatId || !messageId) {
-      await answerTelegramCallbackQuery(token, cb.id);
-      return new Response("OK", { status: 200 });
-    }
-
-    let actionId: string;
-    let paramsStr: string;
-
-    if (data.startsWith("a:")) {
-      const parts = data.slice(2).split(":");
-      actionId = parseCallbackActionId(parts[0] ?? "");
-      paramsStr = parts.slice(1).join(":");
-    } else {
-      const parts = data.split(":");
-      actionId = parts[1] ?? "";
-      paramsStr = parts.slice(2).join(":");
-    }
-
-    await answerTelegramCallbackQuery(token, cb.id, "Running action...");
-
-    const check = await getEnabledActionForPublicKey(publicKey, actionId);
-    if (!check.ok) {
-      await editTelegramMessageText(token, chatId, messageId, `❌ Action failed: ${check.error}`);
-      return new Response("OK", { status: 200 });
-    }
-
-    let parsedParams: Record<string, unknown> | undefined;
-    if (paramsStr) {
-      try {
-        parsedParams = JSON.parse(paramsStr);
-      } catch {
-        parsedParams = { value: paramsStr };
-      }
-    }
-
-    const res = await runProductAction({
-      actionId: check.actionId,
-      params: parsedParams ?? paramsStr,
+    await handleTelegramActionCallback({
+      token,
+      publicKey,
+      productId: product.id,
+      callback: update.callback_query,
     });
-
-    if (res.ok) {
-      const output = res.body ? `\n\n\`\`\`\n${res.body.slice(0, 1500)}\n\`\`\`` : "";
-      await editTelegramMessageText(
-        token,
-        chatId,
-        messageId,
-        `✅ Action executed successfully!${output}`,
-        { parseMode: "Markdown" },
-      );
-    } else {
-      await editTelegramMessageText(
-        token,
-        chatId,
-        messageId,
-        `❌ Action failed: ${res.error ?? "Unknown error"}`,
-      );
-    }
-
     return new Response("OK", { status: 200 });
   }
 
-  // Handle incoming message
   const msg = update.message;
   if (!msg || !msg.text || msg.from?.is_bot) {
     return new Response("OK", { status: 200 });
@@ -185,9 +115,33 @@ export async function POST(request: Request, context: { params: Promise<{ public
 
   const chatId = msg.chat.id;
   const userText = msg.text.trim();
+  const telegramUserId = msg.from?.id != null ? String(msg.from.id) : null;
+  const command = userText.split(/\s+/)[0]?.split("@")[0]?.toLowerCase() ?? "";
 
   if (!allowRequest(`${publicKey}:${chatId}`)) {
     await sendTelegramMessage(token, chatId, "Too many requests. Please wait a minute.");
+    return new Response("OK", { status: 200 });
+  }
+
+  if (
+    await handleTelegramWalletCommands({
+      token,
+      chatId,
+      command,
+      telegramUserId,
+      product,
+      dashboardBase,
+    })
+  ) {
+    return new Response("OK", { status: 200 });
+  }
+
+  if (!llm) {
+    await sendTelegramMessage(
+      token,
+      chatId,
+      "The agent is currently unavailable (missing model key).",
+    );
     return new Response("OK", { status: 200 });
   }
 
@@ -242,18 +196,16 @@ export async function POST(request: Request, context: { params: Promise<{ public
           const paramsStr = args.params != null ? String(args.params) : "";
           const callbackData = buildCallbackData(action.id, paramsStr);
 
-          await sendTelegramMessage(token, chatId, proposed.reply, {
-            replyMarkup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: `▶ Run ${action.name}`,
-                    callback_data: callbackData,
-                  },
-                ],
-              ],
+          await sendTelegramMessage(
+            token,
+            chatId,
+            `${proposed.reply}\n\nNeed a linked wallet? Send /connect first.`,
+            {
+              replyMarkup: {
+                inline_keyboard: [[{ text: `Run ${action.name}`, callback_data: callbackData }]],
+              },
             },
-          });
+          );
           return new Response("OK", { status: 200 });
         }
 
