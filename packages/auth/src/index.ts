@@ -5,3 +5,4 @@
 // is composed at the route-handler (Node) layer.
 export * from "./challenge";
 export * from "./session";
+export * from "./connect-token";

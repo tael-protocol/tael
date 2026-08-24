@@ -7,6 +7,7 @@ import { payments } from "./payments";
 import { apiKeys } from "./api-keys";
 import { chatThreads, chatMessages } from "./chat";
 import { products, productContent, productActions } from "./products";
+import { channelLinks } from "./channel-links";
 
 // Typed relations enable Drizzle's relational query API (db.query.users.findMany
 // with `with: { wallets: true }`, etc.) without hand-written joins.
@@ -17,6 +18,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   capabilities: many(capabilities),
   apiKeys: many(apiKeys),
   products: many(products),
+  channelLinks: many(channelLinks),
 }));
 
 export const walletsRelations = relations(wallets, ({ one, many }) => ({
@@ -33,6 +35,7 @@ export const agentsRelations = relations(agents, ({ one, many }) => ({
   owner: one(users, { fields: [agents.ownerId], references: [users.id] }),
   wallet: one(wallets, { fields: [agents.walletId], references: [wallets.id] }),
   payments: many(payments),
+  channelLinks: many(channelLinks),
 }));
 
 export const paymentsRelations = relations(payments, ({ one }) => ({
@@ -57,6 +60,7 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   owner: one(users, { fields: [products.ownerId], references: [users.id] }),
   content: many(productContent),
   actions: many(productActions),
+  channelLinks: many(channelLinks),
 }));
 
 export const productContentRelations = relations(productContent, ({ one }) => ({
@@ -65,4 +69,10 @@ export const productContentRelations = relations(productContent, ({ one }) => ({
 
 export const productActionsRelations = relations(productActions, ({ one }) => ({
   product: one(products, { fields: [productActions.productId], references: [products.id] }),
+}));
+
+export const channelLinksRelations = relations(channelLinks, ({ one }) => ({
+  user: one(users, { fields: [channelLinks.userId], references: [users.id] }),
+  agent: one(agents, { fields: [channelLinks.agentId], references: [agents.id] }),
+  product: one(products, { fields: [channelLinks.productId], references: [products.id] }),
 }));

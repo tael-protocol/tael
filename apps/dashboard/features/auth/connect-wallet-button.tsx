@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@tael/ui";
 import { getWalletKit } from "./wallet-kit";
 
-export function ConnectWalletButton() {
+export function ConnectWalletButton({ redirectTo }: { redirectTo?: string }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +40,7 @@ export function ConnectWalletButton() {
         throw new Error(data.error ?? "Sign-in failed");
       }
 
-      router.push("/");
+      router.push(redirectTo && redirectTo.startsWith("/") ? redirectTo : "/");
       router.refresh();
     } catch (err) {
       // authModal rejects when the user simply closes the picker — don't shout about that.

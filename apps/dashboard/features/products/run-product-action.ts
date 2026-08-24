@@ -52,6 +52,11 @@ export async function runProductAction(input: {
   agentId?: string;
   /** Params from the confirm proposal. */
   params?: string | Record<string, unknown>;
+  /**
+   * When set (Telegram/Discord channel link), pay as this user instead of
+   * requiring the product owner session.
+   */
+  payerUserId?: string;
 }): Promise<RunProductActionResult> {
   const [row] = await db
     .select({
@@ -71,10 +76,21 @@ export async function runProductAction(input: {
   if (!row || !row.enabled) return { ok: false, error: "Action not found." };
 
   if (row.kind === "capability") {
-    const user = await getCurrentUser();
-    if (!user) return { ok: false, error: "Not signed in." };
-    if (user.id !== row.ownerId) return { ok: false, error: "Not allowed." };
-    if (!input.agentId) return { ok: false, error: "Pick a Card to pay for this run." };
+    let payerUserId: string;
+    let agentId = input.agentId;
+
+    if (input.payerUserId) {
+      payerUserId = input.payerUserId;
+      if (!agentId) {
+        return { ok: false, error: "No Card linked. Send /connect in this bot first." };
+      }
+    } else {
+      const user = await getCurrentUser();
+      if (!user) return { ok: false, error: "Not signed in." };
+      if (user.id !== row.ownerId) return { ok: false, error: "Not allowed." };
+      payerUserId = user.id;
+      if (!agentId) return { ok: false, error: "Pick a Card to pay for this run." };
+    }
 
     const slug = "slug" in row.config ? row.config.slug : "";
     if (!slug) return { ok: false, error: "Action is misconfigured." };
@@ -89,11 +105,12 @@ export async function runProductAction(input: {
     // Default to GET with query; JSON body → POST.
     const method = looksJson ? "POST" : "GET";
     const result: RunResult = await runCapability({
-      agentId: input.agentId,
+      agentId,
       slug,
       method,
       body: looksJson ? paramsStr : undefined,
       query: !looksJson ? paramsStr : undefined,
+      ownerId: payerUserId,
     });
     return {
       ok: result.ok,

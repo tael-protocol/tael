@@ -164,9 +164,18 @@ export async function runCapability(input: {
   body?: string;
   /** Query string for GET calls (e.g. `address=G…`), appended to the URL. */
   query?: string;
+  /**
+   * When set, pay as this user (must own the Card). Used by Telegram/Discord
+   * channel runners that have no browser session cookie.
+   */
+  ownerId?: string;
 }): Promise<RunResult> {
-  const user = await getCurrentUser();
-  if (!user) return { ok: false, error: "Not signed in." };
+  let ownerId = input.ownerId;
+  if (!ownerId) {
+    const user = await getCurrentUser();
+    if (!user) return { ok: false, error: "Not signed in." };
+    ownerId = user.id;
+  }
 
   const [agent] = await db
     .select({
@@ -176,7 +185,7 @@ export async function runCapability(input: {
     })
     .from(agents)
     .innerJoin(wallets, eq(agents.walletId, wallets.id))
-    .where(and(eq(agents.id, input.agentId), eq(agents.ownerId, user.id)))
+    .where(and(eq(agents.id, input.agentId), eq(agents.ownerId, ownerId)))
     .limit(1);
 
   if (!agent?.secretEnc) return { ok: false, error: "Agent wallet not found." };

@@ -33,6 +33,8 @@ const createAgentSchema = z.object({
 
 export interface CreateAgentResult {
   ok: boolean;
+  /** New agent/Card id. */
+  id?: string;
   /** The new hot wallet's public address to fund. */
   address?: string;
   /** True once the wallet is provisioned (funded + USDC trustline) and can receive USDC. */
@@ -62,6 +64,7 @@ export async function createAgent(input: {
   const { name, maxPerCall, dailyLimit } = parsed.data;
 
   const keypair = generateKeypair();
+  let agentId: string | undefined;
 
   try {
     await db.transaction(async (tx) => {
@@ -75,12 +78,16 @@ export async function createAgent(input: {
         })
         .returning({ id: wallets.id });
 
-      await tx.insert(agents).values({
-        ownerId: user.id,
-        name,
-        walletId: wallet!.id,
-        policy: { maxPerCall, dailyLimit, blockedPublishers: [] },
-      });
+      const [agent] = await tx
+        .insert(agents)
+        .values({
+          ownerId: user.id,
+          name,
+          walletId: wallet!.id,
+          policy: { maxPerCall, dailyLimit, blockedPublishers: [] },
+        })
+        .returning({ id: agents.id });
+      agentId = agent?.id;
     });
   } catch (error) {
     console.error("[agents] create failed:", error);
@@ -111,6 +118,7 @@ export async function createAgent(input: {
   revalidatePath("/agents");
   return {
     ok: true,
+    id: agentId,
     address: keypair.publicKey,
     ready: provision.ready,
     provisionError: provision.ok ? undefined : provision.error,
