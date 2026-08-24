@@ -1,15 +1,18 @@
 import { getEnabledActionForPublicKey, runProductAction } from "./run-product-action";
 import { getTelegramChannelLink } from "./channel-links";
+import { consumePendingActionConfirm } from "./pending-action-confirms";
+import { parseActionCallbackData } from "./pending-callback";
 import {
   answerTelegramCallbackQuery,
   editTelegramMessageText,
   type TelegramCallbackQuery,
 } from "./telegram";
 
-/** Reconstructs UUID from 32-hex actionId in callback_data. */
+/** Reconstructs UUID from 32-hex actionId in legacy callback_data. */
 function parseCallbackActionId(rawHex: string): string {
-  if (rawHex.length !== 32) return rawHex;
-  return `${rawHex.slice(0, 8)}-${rawHex.slice(8, 12)}-${rawHex.slice(12, 16)}-${rawHex.slice(16, 20)}-${rawHex.slice(20)}`;
+  const hex = rawHex.replace(/-/g, "");
+  if (hex.length !== 32) return rawHex;
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
 /** Handle action-confirm button clicks. Returns true if handled. */
@@ -25,39 +28,49 @@ export async function handleTelegramActionCallback(input: {
   const messageId = cb.message?.message_id;
   const telegramUserId = cb.from?.id != null ? String(cb.from.id) : null;
 
-  if ((!data.startsWith("a:") && !data.startsWith("run_action:")) || !chatId || !messageId) {
+  const parsed = parseActionCallbackData(data);
+  if (!parsed || !chatId || !messageId) {
     await answerTelegramCallbackQuery(token, cb.id);
     return true;
   }
 
-  let actionId: string;
-  let paramsStr: string;
-
-  if (data.startsWith("a:")) {
-    const parts = data.slice(2).split(":");
-    actionId = parseCallbackActionId(parts[0] ?? "");
-    paramsStr = parts.slice(1).join(":");
-  } else {
-    const parts = data.split(":");
-    actionId = parts[1] ?? "";
-    paramsStr = parts.slice(2).join(":");
-  }
-
   await answerTelegramCallbackQuery(token, cb.id, "Running action...");
+
+  let actionId: string;
+  let actionParams: string | Record<string, unknown> | null | undefined;
+
+  if (parsed.kind === "pending") {
+    const pending = await consumePendingActionConfirm({
+      token: parsed.token,
+      channel: "telegram",
+      externalUserId: telegramUserId,
+    });
+    if (!pending || pending.productId !== productId) {
+      await editTelegramMessageText(
+        token,
+        chatId,
+        messageId,
+        "This confirmation expired. Ask again to get a new button.",
+      );
+      return true;
+    }
+    actionId = pending.actionId;
+    actionParams = pending.params;
+  } else {
+    actionId = parseCallbackActionId(parsed.actionIdHex);
+    if (parsed.paramsStr) {
+      try {
+        actionParams = JSON.parse(parsed.paramsStr) as Record<string, unknown>;
+      } catch {
+        actionParams = parsed.paramsStr;
+      }
+    }
+  }
 
   const check = await getEnabledActionForPublicKey(publicKey, actionId);
   if (!check.ok) {
     await editTelegramMessageText(token, chatId, messageId, `Action failed: ${check.error}`);
     return true;
-  }
-
-  let parsedParams: Record<string, unknown> | undefined;
-  if (paramsStr) {
-    try {
-      parsedParams = JSON.parse(paramsStr);
-    } catch {
-      parsedParams = { value: paramsStr };
-    }
   }
 
   const link = telegramUserId ? await getTelegramChannelLink(productId, telegramUserId) : null;
@@ -73,21 +86,27 @@ export async function handleTelegramActionCallback(input: {
 
   const res = await runProductAction({
     actionId: check.actionId,
-    params: parsedParams ?? paramsStr,
+    params: actionParams,
     payerUserId: link.userId,
     agentId: link.agentId,
   });
 
   if (res.ok) {
     const paid = res.paid ? `\nPaid: ${res.paid} USDC` : "";
-    const proof = res.txHash ? `\nTx: \`${res.txHash}\`` : "";
-    const output = res.body ? `\n\n\`\`\`\n${res.body.slice(0, 1500)}\n\`\`\`` : "";
+    const proof = res.txHash ? `\nTx: <code>${res.txHash}</code>` : "";
+    const safeBody = res.body
+      ? `\n\n<pre>${res.body
+          .slice(0, 1500)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")}</pre>`
+      : "";
     await editTelegramMessageText(
       token,
       chatId,
       messageId,
-      `Action executed successfully!${paid}${proof}${output}`,
-      { parseMode: "Markdown" },
+      `Action executed successfully!${paid}${proof}${safeBody}`,
+      { parseMode: "HTML" },
     );
   } else {
     await editTelegramMessageText(

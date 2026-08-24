@@ -22,11 +22,13 @@ export const productActionKind = pgEnum("product_action_kind", ["capability", "h
 
 /**
  * Config for a product action. Discriminated by `kind` on the row:
- *  - capability → `{ slug }`
+ *  - capability → `{ slug, operation? }` (e.g. slug `stellar` + operation `pay`,
+ *    or combined slug `stellar/pay`)
  *  - http → `{ url, method, paramsSchema? }`
  */
 export type ProductActionConfig =
-  { slug: string } | { url: string; method: string; paramsSchema?: Record<string, unknown> };
+  | { slug: string; operation?: string }
+  | { url: string; method: string; paramsSchema?: Record<string, unknown> };
 
 /**
  * One product tenant: an embeddable agent configured by a product owner.

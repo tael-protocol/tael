@@ -2,6 +2,7 @@ import type { Product } from "@tael/database";
 import { createLlmChatCompletion, getLlmConfig } from "../../lib/llm";
 import { getProductActionsForChat, getProductContentForChat } from "./queries";
 import { editDiscordInteractionResponse } from "./discord";
+import { createPendingActionConfirm, consumePendingActionConfirm } from "./pending-action-confirms";
 import { getEnabledActionForPublicKey, runProductAction } from "./run-product-action";
 import {
   actionIdFromToolName,
@@ -40,7 +41,27 @@ function safeParseArgs(raw: string | undefined): Record<string, unknown> {
   }
 }
 
-function runActionButton(actionId: string, paramsStr: string): unknown[] {
+function normalizeToolParams(raw: unknown): string | Record<string, unknown> | null {
+  if (raw == null) return null;
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  const asString = String(raw).trim();
+  if (!asString) return null;
+  if (asString.startsWith("{")) {
+    try {
+      const parsed: unknown = JSON.parse(asString);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // keep string
+    }
+  }
+  return asString;
+}
+
+function runPendingButton(token: string): unknown[] {
   return [
     {
       type: 1,
@@ -49,7 +70,7 @@ function runActionButton(actionId: string, paramsStr: string): unknown[] {
           type: 2,
           style: 1,
           label: "Run action",
-          custom_id: `run:${actionId}:${paramsStr}`.slice(0, 100),
+          custom_id: `c:${token}`.slice(0, 100),
         },
       ],
     },
@@ -58,12 +79,27 @@ function runActionButton(actionId: string, paramsStr: string): unknown[] {
 
 export async function handleDiscordActionConfirm(
   publicKey: string,
+  productId: string,
   applicationId: string,
   interactionToken: string,
-  actionId: string,
-  paramsStr: string,
+  pendingToken: string,
+  discordUserId?: string | null,
 ): Promise<void> {
-  const check = await getEnabledActionForPublicKey(publicKey, actionId);
+  const pending = await consumePendingActionConfirm({
+    token: pendingToken,
+    channel: "discord",
+    externalUserId: discordUserId,
+  });
+  if (!pending || pending.productId !== productId) {
+    await editDiscordInteractionResponse(
+      applicationId,
+      interactionToken,
+      "This confirmation expired. Ask again to get a new button.",
+    );
+    return;
+  }
+
+  const check = await getEnabledActionForPublicKey(publicKey, pending.actionId);
   if (!check.ok) {
     await editDiscordInteractionResponse(
       applicationId,
@@ -73,18 +109,9 @@ export async function handleDiscordActionConfirm(
     return;
   }
 
-  let parsedParams: Record<string, unknown> | string | undefined = paramsStr || undefined;
-  if (paramsStr) {
-    try {
-      parsedParams = JSON.parse(paramsStr) as Record<string, unknown>;
-    } catch {
-      parsedParams = { value: paramsStr };
-    }
-  }
-
   const res = await runProductAction({
     actionId: check.actionId,
-    params: parsedParams,
+    params: pending.params,
   });
 
   if (res.ok) {
@@ -109,6 +136,7 @@ export async function handleDiscordAsk(
   applicationId: string,
   interactionToken: string,
   question: string,
+  discordUserId?: string | null,
 ): Promise<void> {
   const llm = getLlmConfig();
   if (!llm) {
@@ -125,7 +153,10 @@ export async function handleDiscordAsk(
     getProductActionsForChat(product.id),
   ]);
 
-  const system = buildWidgetSystemPrompt(product, content, actions);
+  // Each /ask is single-turn — never open with a canned greeting.
+  const system = buildWidgetSystemPrompt(product, content, actions, {
+    allowGreeting: false,
+  });
   const tools = buildWidgetTools(actions);
   const actionsById = new Map(actions.map((a) => [a.id, a]));
 
@@ -172,13 +203,19 @@ export async function handleDiscordAsk(
 
           const args = safeParseArgs(call.function.arguments);
           const proposed = proposeWidgetAction(action, args);
-          const paramsStr = args.params != null ? String(args.params) : "";
+          const pendingToken = await createPendingActionConfirm({
+            productId: product.id,
+            actionId: action.id,
+            channel: "discord",
+            externalUserId: discordUserId,
+            params: normalizeToolParams(args.params),
+          });
 
           await editDiscordInteractionResponse(
             applicationId,
             interactionToken,
             proposed.reply,
-            runActionButton(action.id, paramsStr),
+            runPendingButton(pendingToken),
           );
           return;
         }

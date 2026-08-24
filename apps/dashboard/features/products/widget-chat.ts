@@ -64,7 +64,7 @@ export function buildWidgetTools(actions: ProductAction[]): WidgetToolDef[] {
         description:
           action.kind === "http"
             ? "Optional JSON object of parameters to send with the HTTP request."
-            : "Optional parameters for the capability (query string or JSON), if any are needed.",
+            : 'Parameters for the capability. Prefer a JSON object string like {"to":"G…","amount":"0.05"} for Pay, or a query string to=G…&amount=0.05.',
       },
     };
     return {
@@ -142,30 +142,56 @@ export function buildWidgetSystemPrompt(
   product: Product,
   content: ProductContent[],
   actions: ProductAction[] = [],
+  options?: {
+    /** When false, never open with a greeting (Telegram mid-chat turns). */
+    allowGreeting?: boolean;
+  },
 ): string {
   const knowledge = formatContentForPrompt(content, CONTENT_BUDGET_CHARS);
   const description = product.description.trim();
   const greeting = product.greeting.trim();
+  const allowGreeting = options?.allowGreeting !== false;
 
   const actionLines =
     actions.length > 0
       ? [
           "",
           "## Available actions",
-          "You can propose the following actions via tools when they clearly help the user. Do not claim an action already ran: proposing returns a confirmation the user must approve first.",
-          ...actions.map((a) => `- ${a.name} (${a.kind}): ${a.description}`),
+          "You can propose ONLY the following product actions via tools when they clearly help the user. Do not invent other capabilities. Do not claim an action already ran: proposing returns a confirmation the user must approve first.",
+          ...actions.map((a) => {
+            const slug =
+              a.kind === "capability" && "slug" in a.config
+                ? a.config.operation
+                  ? `${a.config.slug}/${a.config.operation}`
+                  : a.config.slug
+                : null;
+            const suffix = slug ? ` [capability: ${slug}]` : "";
+            return `- ${a.name} (${a.kind})${suffix}: ${a.description}`;
+          }),
+          "",
+          'For capability actions that need inputs (e.g. Pay: destination + amount), put them in the tool `params` as a JSON object like {"to":"G…","amount":"0.05"} or as a query string to=G…&amount=0.05.',
         ]
       : [];
 
+  const greetingLines = allowGreeting
+    ? [
+        greeting
+          ? `Opening greeting (use ONLY on the very first reply in a new conversation, or when the user says /start). Do not repeat it on later messages. Spirit: "${greeting}"`
+          : null,
+        'Never start a reply with a canned greeting like "How can I help you?" unless this is the first message and that phrase is the configured opening greeting.',
+      ]
+    : [
+        'This is a continuing conversation. Do NOT greet. Do NOT say hello, hi, or "How can I help you?". Answer the user\'s latest message directly.',
+      ];
+
   const parts = [
-    `You are the on-site assistant for ${product.name}.`,
+    `You are the product assistant for ${product.name}. Speak as this product's own agent — helpful, concise, and on-brand — not as a generic marketplace or Stellar capability catalog.`,
     description ? `About this product: ${description}` : null,
-    greeting
-      ? `Opening greeting (use ONLY on the very first reply in a new conversation, or when the user says /start). Do not repeat it on later messages. Spirit: "${greeting}"`
-      : null,
-    "Never start a reply with a canned greeting like \"How can I help you?\" unless this is the first message and that phrase is the configured opening greeting.",
+    ...greetingLines,
     "",
-    "Answer using only the product knowledge below. If the answer is not in that knowledge, say you do not know based on the information you have. Do not invent facts, prices, or policies. Keep replies concise and helpful.",
+    "Answer using only the product knowledge below. If the answer is not in that knowledge, say you do not know based on the information you have. Do not invent facts, prices, or policies.",
+    "Do not dump Free/Priced/On-chain capability menus, marketplace listings, or unrelated Stellar operation catalogs unless the product knowledge explicitly contains that and the user asked for it.",
+    "Keep replies concise. Prefer short sentences over bullet catalogs.",
     "",
     "## Product knowledge",
     knowledge || "(No content has been added yet. Say you do not have product information yet.)",

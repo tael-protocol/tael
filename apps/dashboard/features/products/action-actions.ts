@@ -13,6 +13,7 @@ const httpMethodSchema = z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]);
 
 const capabilityConfigSchema = z.object({
   slug: z.string().trim().min(1, "Capability slug is required").max(120),
+  operation: z.string().trim().min(1).max(80).optional(),
 });
 
 const httpConfigSchema = z.object({

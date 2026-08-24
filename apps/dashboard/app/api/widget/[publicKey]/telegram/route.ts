@@ -6,6 +6,11 @@ import {
 import { handleTelegramActionCallback } from "../../../../../features/products/telegram-action-callback";
 import { handleTelegramWalletCommands } from "../../../../../features/products/telegram-wallet-commands";
 import {
+  buildPendingCallbackData,
+  createPendingActionConfirm,
+} from "../../../../../features/products/pending-action-confirms";
+import { markdownToTelegramHtml } from "../../../../../features/products/telegram-html";
+import {
   sendTelegramMessage,
   type TelegramUpdate,
 } from "../../../../../features/products/telegram";
@@ -53,14 +58,25 @@ function safeParseArgs(raw: string | undefined): Record<string, unknown> {
   }
 }
 
-/** Formats a compact callback_data string under Telegram's strict 64-byte limit. */
-function buildCallbackData(actionId: string, paramsStr: string): string {
-  const hex = actionId.replace(/-/g, "");
-  const prefix = `a:${hex}`;
-  if (!paramsStr) return prefix;
-  const maxParamsLen = 63 - prefix.length - 1;
-  const safeParams = paramsStr.slice(0, Math.max(0, maxParamsLen));
-  return `${prefix}:${safeParams}`;
+/** Normalize tool params into a value we can store + later run. */
+function normalizeToolParams(raw: unknown): string | Record<string, unknown> | null {
+  if (raw == null) return null;
+  if (typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
+  }
+  const asString = String(raw).trim();
+  if (!asString) return null;
+  if (asString.startsWith("{")) {
+    try {
+      const parsed: unknown = JSON.parse(asString);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // keep string
+    }
+  }
+  return asString;
 }
 
 export async function POST(request: Request, context: { params: Promise<{ publicKey: string }> }) {
@@ -117,6 +133,7 @@ export async function POST(request: Request, context: { params: Promise<{ public
   const userText = msg.text.trim();
   const telegramUserId = msg.from?.id != null ? String(msg.from.id) : null;
   const command = userText.split(/\s+/)[0]?.split("@")[0]?.toLowerCase() ?? "";
+  const isStart = command === "/start";
 
   if (!allowRequest(`${publicKey}:${chatId}`)) {
     await sendTelegramMessage(token, chatId, "Too many requests. Please wait a minute.");
@@ -150,7 +167,10 @@ export async function POST(request: Request, context: { params: Promise<{ public
     getProductActionsForChat(product.id),
   ]);
 
-  const system = buildWidgetSystemPrompt(product, content, actions);
+  // Telegram webhooks are single-turn (no history), so greet only on /start.
+  const system = buildWidgetSystemPrompt(product, content, actions, {
+    allowGreeting: isStart,
+  });
   const tools = buildWidgetTools(actions);
   const actionsById = new Map(actions.map((a) => [a.id, a]));
 
@@ -193,14 +213,24 @@ export async function POST(request: Request, context: { params: Promise<{ public
 
           const args = safeParseArgs(call.function.arguments);
           const proposed = proposeWidgetAction(action, args);
-          const paramsStr = args.params != null ? String(args.params) : "";
-          const callbackData = buildCallbackData(action.id, paramsStr);
+          const pendingParams = normalizeToolParams(args.params);
+          const pendingToken = await createPendingActionConfirm({
+            productId: product.id,
+            actionId: action.id,
+            channel: "telegram",
+            externalUserId: telegramUserId,
+            params: pendingParams,
+          });
+          const callbackData = buildPendingCallbackData(pendingToken);
 
           await sendTelegramMessage(
             token,
             chatId,
-            `${proposed.reply}\n\nNeed a linked wallet? Send /connect first.`,
+            markdownToTelegramHtml(
+              `${proposed.reply}\n\nNeed a linked wallet? Send /connect first.`,
+            ),
             {
+              parseMode: "HTML",
               replyMarkup: {
                 inline_keyboard: [[{ text: `Run ${action.name}`, callback_data: callbackData }]],
               },
@@ -223,7 +253,9 @@ export async function POST(request: Request, context: { params: Promise<{ public
 
       const text = typeof message.content === "string" ? message.content.trim() : "";
       if (text) {
-        await sendTelegramMessage(token, chatId, text, { parseMode: "Markdown" });
+        await sendTelegramMessage(token, chatId, markdownToTelegramHtml(text), {
+          parseMode: "HTML",
+        });
       }
       return new Response("OK", { status: 200 });
     }

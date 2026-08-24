@@ -33,7 +33,9 @@ const KIND_META: Record<ProductAction["kind"], { label: string; icon: typeof Zap
 
 function configSummary(item: ProductAction): string {
   if (item.kind === "capability" && "slug" in item.config) {
-    return item.config.slug;
+    return item.config.operation
+      ? `${item.config.slug}/${item.config.operation}`
+      : item.config.slug;
   }
   if (item.kind === "http" && "url" in item.config) {
     return `${item.config.method} ${item.config.url}`;
