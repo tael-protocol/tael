@@ -11,6 +11,7 @@ import {
   buildWidgetTools,
   proposeWidgetAction,
 } from "./widget-chat";
+import { formatActionResultForChat, withDiscordAskContext } from "./format-action-result";
 
 const MAX_TOKENS = 700;
 const MAX_TOOL_HOPS = 3;
@@ -147,13 +148,15 @@ export async function handleDiscordActionConfirm(
   });
 
   if (res.ok) {
-    const paid = res.paid ? `\nPaid: ${res.paid} USDC` : "";
-    const proof = res.txHash ? `\nTx: \`${res.txHash}\`` : "";
-    const output = res.body ? `\n\`\`\`\n${res.body.slice(0, 1200)}\n\`\`\`` : "";
     await editDiscordInteractionResponse(
       applicationId,
       interactionToken,
-      `Action executed successfully!${paid}${proof}${output}`,
+      formatActionResultForChat({
+        ok: true,
+        body: res.body,
+        paid: res.paid,
+        txHash: res.txHash,
+      }),
     );
     return;
   }
@@ -161,7 +164,10 @@ export async function handleDiscordActionConfirm(
   await editDiscordInteractionResponse(
     applicationId,
     interactionToken,
-    `Action failed: ${res.error ?? "Unknown error"}`,
+    formatActionResultForChat({
+      ok: false,
+      error: res.error ?? "Unknown error",
+    }),
   );
 }
 
@@ -178,7 +184,7 @@ export async function handleDiscordAsk(
     await editDiscordInteractionResponse(
       applicationId,
       interactionToken,
-      "The agent is currently unavailable (missing model key).",
+      withDiscordAskContext(question, "The agent is currently unavailable (missing model key)."),
     );
     return;
   }
@@ -212,7 +218,10 @@ export async function handleDiscordAsk(
         await editDiscordInteractionResponse(
           applicationId,
           interactionToken,
-          "The agent is currently unavailable. Please try again later.",
+          withDiscordAskContext(
+            question,
+            "The agent is currently unavailable. Please try again later.",
+          ),
         );
         return;
       }
@@ -223,7 +232,7 @@ export async function handleDiscordAsk(
         await editDiscordInteractionResponse(
           applicationId,
           interactionToken,
-          "No response received from the agent.",
+          withDiscordAskContext(question, "No response received from the agent."),
         );
         return;
       }
@@ -244,7 +253,10 @@ export async function handleDiscordAsk(
               await editDiscordInteractionResponse(
                 applicationId,
                 interactionToken,
-                `${proposed.reply}\n\n**Paid actions are DM-only.** Message this bot privately → \`/connect\` → then \`/ask\` again in the DM.`,
+                withDiscordAskContext(
+                  question,
+                  `${proposed.reply}\n\n**Paid actions are DM-only.** Message this bot privately → \`/connect\` → then \`/ask\` again in the DM.`,
+                ),
               );
               return;
             }
@@ -253,7 +265,7 @@ export async function handleDiscordAsk(
               await editDiscordInteractionResponse(
                 applicationId,
                 interactionToken,
-                "Could not identify your Discord user.",
+                withDiscordAskContext(question, "Could not identify your Discord user."),
               );
               return;
             }
@@ -263,7 +275,10 @@ export async function handleDiscordAsk(
               await editDiscordInteractionResponse(
                 applicationId,
                 interactionToken,
-                `${proposed.reply}\n\nConnect your wallet first: run \`/connect\` in this DM, open the link, then ask again.`,
+                withDiscordAskContext(
+                  question,
+                  `${proposed.reply}\n\nConnect your wallet first: run \`/connect\` in this DM, open the link, then ask again.`,
+                ),
               );
               return;
             }
@@ -280,7 +295,10 @@ export async function handleDiscordAsk(
           await editDiscordInteractionResponse(
             applicationId,
             interactionToken,
-            `${proposed.reply}\n\nNeed a linked wallet? Run \`/connect\` in this DM first.`,
+            withDiscordAskContext(
+              question,
+              `${proposed.reply}\n\nNeed a linked wallet? Run \`/connect\` in this DM first.`,
+            ),
             runPendingButton(pendingToken),
           );
           return;
@@ -302,7 +320,7 @@ export async function handleDiscordAsk(
       await editDiscordInteractionResponse(
         applicationId,
         interactionToken,
-        text || "I could not find an answer for that.",
+        withDiscordAskContext(question, text || "I could not find an answer for that."),
       );
       return;
     }
@@ -310,13 +328,16 @@ export async function handleDiscordAsk(
     await editDiscordInteractionResponse(
       applicationId,
       interactionToken,
-      "I couldn't quite complete that request. Could you rephrase?",
+      withDiscordAskContext(
+        question,
+        "I couldn't quite complete that request. Could you rephrase?",
+      ),
     );
   } catch {
     await editDiscordInteractionResponse(
       applicationId,
       interactionToken,
-      "An error occurred while processing your request.",
+      withDiscordAskContext(question, "An error occurred while processing your request."),
     );
   }
 }
