@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Copy, ExternalLink, MessageCircle, Unplug } from "lucide-react";
 import { Button, Input } from "@tael/ui";
@@ -12,7 +12,7 @@ interface DiscordConnectPanelProps {
   product: Product;
   baseUrl: string;
   pending: boolean;
-  startTransition: ReturnType<typeof useTransition>[1];
+  startTransition: (action: () => void | Promise<void>) => void;
 }
 
 export function DiscordConnectPanel({
