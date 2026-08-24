@@ -6,6 +6,7 @@ import { Check, Copy, ExternalLink, MessageCircle, Unplug } from "lucide-react";
 import { Button, Input } from "@tael/ui";
 import type { Product } from "@tael/database";
 import { connectDiscordBot, disconnectDiscordBot } from "./actions";
+import { buildDiscordUserInstallUrl } from "./discord";
 
 interface DiscordConnectPanelProps {
   product: Product;
@@ -68,7 +69,7 @@ export function DiscordConnectPanel({
       );
       if (res.ok) {
         setDiscordSuccess(
-          `Connected as ${res.botUsername ?? "bot"}. Paste the Interactions URL in Discord.`,
+          `Connected as ${res.botUsername ?? "bot"}. Paste Interactions URL, then use DMs for /connect + paid actions.`,
         );
         setDiscordInviteUrl(res.inviteUrl ?? null);
         setDiscordToken("");
@@ -102,9 +103,10 @@ export function DiscordConnectPanel({
       <div>
         <h2 className="text-base font-semibold">Discord Bot Integration</h2>
         <p className="text-sm text-muted-foreground">
-          Connect your Discord application so anyone in the server can run{" "}
-          <span className="font-mono text-xs">/ask</span> and get answers from this product agent.
-          Action confirmations show as buttons, same as Telegram.
+          Connect your Discord application so people can{" "}
+          <span className="font-mono text-xs">/ask</span> in servers or DMs. Wallet connect and paid
+          actions are <span className="font-medium text-foreground">DM-only</span> for safety —
+          Hermies-style private chat, not public channel spends.
         </p>
       </div>
 
@@ -165,6 +167,29 @@ export function DiscordConnectPanel({
               >
                 Open invite link <ExternalLink className="h-3.5 w-3.5" />
               </a>
+            </div>
+          ) : null}
+
+          {discordClientId ? (
+            <div className="space-y-2 rounded-lg border bg-background/60 p-3">
+              <p className="text-xs font-medium">3. Add App for personal DMs (Hermies-style)</p>
+              <p className="text-xs text-muted-foreground">
+                Users can install the app to their account and message the bot in DMs without a
+                shared server. Also enable User Install in Discord → Installation if available.
+              </p>
+              <a
+                href={buildDiscordUserInstallUrl(discordClientId)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-sm text-foreground underline-offset-4 hover:underline"
+              >
+                Open user-install link <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+              <p className="text-xs text-muted-foreground">
+                After reconnecting, commands include <span className="font-mono">/connect</span>,{" "}
+                <span className="font-mono">/wallet</span>,{" "}
+                <span className="font-mono">/disconnect</span>. Run them in a DM.
+              </p>
             </div>
           ) : null}
         </div>

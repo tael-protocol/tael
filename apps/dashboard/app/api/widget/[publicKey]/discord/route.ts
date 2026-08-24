@@ -7,6 +7,7 @@ import {
   DISCORD_INTERACTION_MESSAGE_COMPONENT,
   DISCORD_INTERACTION_PING,
   getDiscordOptionString,
+  isDiscordDm,
   verifyDiscordRequest,
   type DiscordInteraction,
 } from "../../../../../features/products/discord";
@@ -14,6 +15,7 @@ import {
   handleDiscordActionConfirm,
   handleDiscordAsk,
 } from "../../../../../features/products/discord-chat";
+import { handleDiscordWalletCommand } from "../../../../../features/products/discord-wallet-commands";
 import { createRateLimiter } from "../../../../../features/products/widget-chat";
 
 export const runtime = "nodejs";
@@ -33,6 +35,11 @@ export async function POST(request: Request, context: { params: Promise<{ public
   const publicKey = decodeURIComponent(rawKey ?? "").trim();
   if (!publicKey) return new Response("Missing public key.", { status: 400 });
 
+  // Read body first so signature verify can start ASAP after product lookup.
+  const signature = request.headers.get("x-signature-ed25519");
+  const timestamp = request.headers.get("x-signature-timestamp");
+  const rawBody = await request.text();
+
   const product = await getProductByPublicKey(publicKey);
   if (!product) return new Response("Agent not found.", { status: 404 });
 
@@ -49,10 +56,6 @@ export async function POST(request: Request, context: { params: Promise<{ public
     });
   }
 
-  const signature = request.headers.get("x-signature-ed25519");
-  const timestamp = request.headers.get("x-signature-timestamp");
-  const rawBody = await request.text();
-
   if (
     !signature ||
     !timestamp ||
@@ -68,6 +71,7 @@ export async function POST(request: Request, context: { params: Promise<{ public
     return new Response("Invalid payload.", { status: 400 });
   }
 
+  // Discord requires PONG within ~3s when saving the Interactions URL.
   if (interaction.type === DISCORD_INTERACTION_PING) {
     return jsonResponse({ type: DISCORD_CALLBACK_PONG });
   }
@@ -79,6 +83,12 @@ export async function POST(request: Request, context: { params: Promise<{ public
     });
   }
 
+  const isDm = isDiscordDm(interaction);
+  const discordUserId = interaction.member?.user?.id ?? interaction.user?.id ?? null;
+  const dashboardBase = (
+    process.env.NEXT_PUBLIC_DASHBOARD_URL ?? new URL(request.url).origin
+  ).replace(/\/$/, "");
+
   if (interaction.type === DISCORD_INTERACTION_MESSAGE_COMPONENT) {
     const customId = interaction.data?.custom_id ?? "";
     if (!customId.startsWith("c:")) {
@@ -89,7 +99,6 @@ export async function POST(request: Request, context: { params: Promise<{ public
     }
 
     const pendingToken = customId.slice(2).trim();
-    const discordUserId = interaction.member?.user?.id ?? interaction.user?.id ?? null;
 
     after(() =>
       handleDiscordActionConfirm(
@@ -99,13 +108,31 @@ export async function POST(request: Request, context: { params: Promise<{ public
         interaction.token,
         pendingToken,
         discordUserId,
+        isDm,
       ),
     );
     return jsonResponse({ type: DISCORD_CALLBACK_DEFERRED_CHANNEL_MESSAGE });
   }
 
   if (interaction.type === DISCORD_INTERACTION_APPLICATION_COMMAND) {
-    if (interaction.data?.name !== "ask") {
+    const commandName = interaction.data?.name ?? "";
+
+    if (commandName === "connect" || commandName === "wallet" || commandName === "disconnect") {
+      after(() =>
+        handleDiscordWalletCommand({
+          applicationId,
+          interactionToken: interaction.token,
+          command: commandName,
+          discordUserId,
+          product,
+          dashboardBase,
+          isDm,
+        }),
+      );
+      return jsonResponse({ type: DISCORD_CALLBACK_DEFERRED_CHANNEL_MESSAGE });
+    }
+
+    if (commandName !== "ask") {
       return jsonResponse({
         type: 4,
         data: { content: "Unknown command.", flags: 64 },
@@ -120,7 +147,7 @@ export async function POST(request: Request, context: { params: Promise<{ public
       });
     }
 
-    const userId = interaction.member?.user?.id ?? interaction.user?.id ?? "anon";
+    const userId = discordUserId ?? "anon";
     if (!allowRequest(`${publicKey}:${userId}`)) {
       return jsonResponse({
         type: 4,
@@ -128,7 +155,9 @@ export async function POST(request: Request, context: { params: Promise<{ public
       });
     }
 
-    after(() => handleDiscordAsk(product, applicationId, interaction.token, question, userId));
+    after(() =>
+      handleDiscordAsk(product, applicationId, interaction.token, question, discordUserId, isDm),
+    );
     return jsonResponse({ type: DISCORD_CALLBACK_DEFERRED_CHANNEL_MESSAGE });
   }
 
