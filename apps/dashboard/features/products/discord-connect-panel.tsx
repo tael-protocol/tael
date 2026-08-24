@@ -6,7 +6,7 @@ import { Check, Copy, ExternalLink, MessageCircle, Unplug } from "lucide-react";
 import { Button, Input } from "@tael/ui";
 import type { Product } from "@tael/database";
 import { connectDiscordBot, disconnectDiscordBot } from "./actions";
-import { buildDiscordUserInstallUrl } from "./discord";
+import { buildDiscordUserInstallUrl } from "./discord-urls";
 
 interface DiscordConnectPanelProps {
   product: Product;
