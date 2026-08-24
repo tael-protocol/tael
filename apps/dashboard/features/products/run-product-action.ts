@@ -4,6 +4,7 @@ import { and, eq, productActions, products } from "@tael/database";
 import { db } from "../../lib/db";
 import { runCapability, type RunResult } from "../agents/run-capability";
 import { getCurrentUser } from "../capabilities/current-user";
+import { resolveCapabilityRef, toCapabilityRequest } from "./capability-call";
 
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -51,7 +52,7 @@ export async function runProductAction(input: {
   /** Required for capability actions: the Card that pays. */
   agentId?: string;
   /** Params from the confirm proposal. */
-  params?: string | Record<string, unknown>;
+  params?: string | Record<string, unknown> | null;
   /**
    * When set (Telegram/Discord channel link), pay as this user instead of
    * requiring the product owner session.
@@ -92,24 +93,24 @@ export async function runProductAction(input: {
       if (!agentId) return { ok: false, error: "Pick a Card to pay for this run." };
     }
 
-    const slug = "slug" in row.config ? row.config.slug : "";
-    if (!slug) return { ok: false, error: "Action is misconfigured." };
+    if (!("slug" in row.config) || !row.config.slug) {
+      return { ok: false, error: "Action is misconfigured." };
+    }
 
-    const paramsStr =
-      typeof input.params === "string"
-        ? input.params
-        : input.params
-          ? JSON.stringify(input.params)
-          : undefined;
-    const looksJson = !!paramsStr?.trim().startsWith("{");
-    // Default to GET with query; JSON body → POST.
-    const method = looksJson ? "POST" : "GET";
+    const ref = resolveCapabilityRef({
+      slug: row.config.slug,
+      operation: row.config.operation,
+    });
+    if (!ref.slug) return { ok: false, error: "Action is misconfigured." };
+
+    const call = toCapabilityRequest(input.params);
     const result: RunResult = await runCapability({
       agentId,
-      slug,
-      method,
-      body: looksJson ? paramsStr : undefined,
-      query: !looksJson ? paramsStr : undefined,
+      slug: ref.slug,
+      operation: ref.operation,
+      method: call.method,
+      body: call.body,
+      query: call.query,
       ownerId: payerUserId,
     });
     return {

@@ -41,6 +41,7 @@ export function ConnectActionDialog({
   const [description, setDescription] = useState("");
   const [kind, setKind] = useState<Kind>("capability");
   const [slug, setSlug] = useState("");
+  const [operation, setOperation] = useState("");
   const [url, setUrl] = useState("");
   const [method, setMethod] = useState<"GET" | "POST" | "PUT" | "PATCH" | "DELETE">("POST");
   const [shareAsCapability, setShareAsCapability] = useState(false);
@@ -51,6 +52,7 @@ export function ConnectActionDialog({
     setDescription("");
     setKind("capability");
     setSlug("");
+    setOperation("");
     setUrl("");
     setMethod("POST");
     setShareAsCapability(false);
@@ -66,7 +68,10 @@ export function ConnectActionDialog({
               name,
               description,
               kind: "capability",
-              config: { slug },
+              config: {
+                slug: slug.trim(),
+                ...(operation.trim() ? { operation: operation.trim() } : {}),
+              },
               shareAsCapability,
             }
           : {
@@ -157,14 +162,24 @@ export function ConnectActionDialog({
           </fieldset>
 
           {kind === "capability" ? (
-            <Field label="Capability slug">
-              <Input
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                placeholder="e.g. stellar-pay"
-                className="font-mono text-sm"
-              />
-            </Field>
+            <>
+              <Field label="Capability slug">
+                <Input
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  placeholder="e.g. stellar"
+                  className="font-mono text-sm"
+                />
+              </Field>
+              <Field label="Operation (optional)">
+                <Input
+                  value={operation}
+                  onChange={(e) => setOperation(e.target.value)}
+                  placeholder="e.g. pay — or put stellar/pay in the slug"
+                  className="font-mono text-sm"
+                />
+              </Field>
+            </>
           ) : (
             <>
               <Field label="URL">

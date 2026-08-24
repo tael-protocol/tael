@@ -81,19 +81,25 @@ export async function POST(request: Request, context: { params: Promise<{ public
 
   if (interaction.type === DISCORD_INTERACTION_MESSAGE_COMPONENT) {
     const customId = interaction.data?.custom_id ?? "";
-    if (!customId.startsWith("run:")) {
+    if (!customId.startsWith("c:")) {
       return jsonResponse({
         type: 4,
         data: { content: "Unknown button.", flags: 64 },
       });
     }
 
-    const parts = customId.split(":");
-    const actionId = parts[1] ?? "";
-    const paramsStr = parts.slice(2).join(":");
+    const pendingToken = customId.slice(2).trim();
+    const discordUserId = interaction.member?.user?.id ?? interaction.user?.id ?? null;
 
     after(() =>
-      handleDiscordActionConfirm(publicKey, applicationId, interaction.token, actionId, paramsStr),
+      handleDiscordActionConfirm(
+        publicKey,
+        product.id,
+        applicationId,
+        interaction.token,
+        pendingToken,
+        discordUserId,
+      ),
     );
     return jsonResponse({ type: DISCORD_CALLBACK_DEFERRED_CHANNEL_MESSAGE });
   }
@@ -122,7 +128,9 @@ export async function POST(request: Request, context: { params: Promise<{ public
       });
     }
 
-    after(() => handleDiscordAsk(product, applicationId, interaction.token, question));
+    after(() =>
+      handleDiscordAsk(product, applicationId, interaction.token, question, userId),
+    );
     return jsonResponse({ type: DISCORD_CALLBACK_DEFERRED_CHANNEL_MESSAGE });
   }
 
