@@ -1,10 +1,14 @@
 "use server";
 
-import { and, eq, productActions, products } from "@tael/database";
+import { agents, and, eq, productActions, products, wallets } from "@tael/database";
 import { db } from "../../lib/db";
 import { runCapability, type RunResult } from "../agents/run-capability";
 import { getCurrentUser } from "../capabilities/current-user";
-import { resolveCapabilityRef, toCapabilityRequest } from "./capability-call";
+import {
+  resolveCapabilityRef,
+  toCapabilityRequest,
+  withDefaultCardAddress,
+} from "./capability-call";
 
 const FETCH_TIMEOUT_MS = 15_000;
 
@@ -103,7 +107,20 @@ export async function runProductAction(input: {
     });
     if (!ref.slug) return { ok: false, error: "Action is misconfigured." };
 
-    const call = toCapabilityRequest(input.params);
+    let call = toCapabilityRequest(input.params);
+
+    // Balance/account-style ops need address=… — default to the linked Card when
+    // the model forgot (common on Discord/Telegram: "check my balance").
+    const [wallet] = await db
+      .select({ address: wallets.address })
+      .from(agents)
+      .innerJoin(wallets, eq(agents.walletId, wallets.id))
+      .where(and(eq(agents.id, agentId), eq(agents.ownerId, payerUserId)))
+      .limit(1);
+    if (wallet?.address) {
+      call = withDefaultCardAddress(call, ref, wallet.address);
+    }
+
     const result: RunResult = await runCapability({
       agentId,
       slug: ref.slug,

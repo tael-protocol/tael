@@ -64,7 +64,7 @@ export function buildWidgetTools(actions: ProductAction[]): WidgetToolDef[] {
         description:
           action.kind === "http"
             ? "Optional JSON object of parameters to send with the HTTP request."
-            : 'Parameters for the capability. Prefer a JSON object string like {"to":"G…","amount":"0.05"} for Pay, or a query string to=G…&amount=0.05.',
+            : 'Parameters for the capability. Prefer a JSON object string like {"to":"G…","amount":"0.05"} for Pay, or {"address":"G…"} for Balance. If the user says "my balance" and has a linked Card, address can be omitted.',
       },
     };
     return {

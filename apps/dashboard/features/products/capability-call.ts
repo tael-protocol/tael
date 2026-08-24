@@ -91,3 +91,78 @@ export function toCapabilityRequest(
 
   return { method: "POST", body: JSON.stringify(params) };
 }
+
+/** Stellar ops that require `address=` (or similar) and can default to the Card. */
+const ADDRESS_OPS = new Set([
+  "balance",
+  "account",
+  "payments",
+  "portfolio",
+  "effects",
+  "offers",
+  "claimable",
+]);
+
+/** True when this capability/operation typically needs a Stellar address. */
+export function operationNeedsAddress(ref: CapabilityRef): boolean {
+  const op = (ref.operation ?? "").split("/")[0]?.toLowerCase() ?? "";
+  if (ADDRESS_OPS.has(op)) return true;
+  // Combined legacy slug already split; also catch bare "balance" slug misuse.
+  return ADDRESS_OPS.has(ref.slug.toLowerCase());
+}
+
+/** Whether a capability request already includes an address-like query param. */
+export function requestHasAddress(call: CapabilityRequest): boolean {
+  if (call.query) {
+    const qs = new URLSearchParams(call.query.replace(/^\?/, ""));
+    for (const key of ["address", "account", "claimant"]) {
+      const v = qs.get(key)?.trim();
+      if (v && v.length > 0) return true;
+    }
+  }
+  if (call.body) {
+    try {
+      const parsed: unknown = JSON.parse(call.body);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        const o = parsed as Record<string, unknown>;
+        for (const key of ["address", "account", "claimant"]) {
+          if (typeof o[key] === "string" && o[key].trim()) return true;
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+  return false;
+}
+
+/**
+ * If the op needs an address and none was provided, default to the linked Card
+ * address (Discord/Telegram "check my balance" UX).
+ */
+export function withDefaultCardAddress(
+  call: CapabilityRequest,
+  ref: CapabilityRef,
+  cardAddress: string,
+): CapabilityRequest {
+  if (!operationNeedsAddress(ref) || requestHasAddress(call) || !cardAddress.trim()) {
+    return call;
+  }
+  // Prefer GET query — balance/account/etc. are GET ops.
+  if (call.method === "POST" && call.body) {
+    try {
+      const parsed: unknown = JSON.parse(call.body);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return {
+          method: "POST",
+          body: JSON.stringify({ ...(parsed as Record<string, unknown>), address: cardAddress }),
+        };
+      }
+    } catch {
+      // fall through to query
+    }
+  }
+  const qs = new URLSearchParams(call.query?.replace(/^\?/, "") ?? "");
+  qs.set("address", cardAddress);
+  return { method: "GET", query: qs.toString() };
+}
