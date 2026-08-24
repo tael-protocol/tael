@@ -3,6 +3,7 @@ import { createLlmChatCompletion, getLlmConfig } from "../../lib/llm";
 import { getProductActionsForChat, getProductContentForChat } from "./queries";
 import { editDiscordInteractionResponse } from "./discord";
 import { createPendingActionConfirm, consumePendingActionConfirm } from "./pending-action-confirms";
+import { getDiscordChannelLink } from "./channel-links";
 import { getEnabledActionForPublicKey, runProductAction } from "./run-product-action";
 import {
   actionIdFromToolName,
@@ -83,8 +84,18 @@ export async function handleDiscordActionConfirm(
   applicationId: string,
   interactionToken: string,
   pendingToken: string,
-  discordUserId?: string | null,
+  discordUserId: string | null | undefined,
+  isDm: boolean,
 ): Promise<void> {
+  if (!isDm) {
+    await editDiscordInteractionResponse(
+      applicationId,
+      interactionToken,
+      "Paid actions only run in DMs. Message this bot privately, `/connect`, then try again.",
+    );
+    return;
+  }
+
   const pending = await consumePendingActionConfirm({
     token: pendingToken,
     channel: "discord",
@@ -94,7 +105,7 @@ export async function handleDiscordActionConfirm(
     await editDiscordInteractionResponse(
       applicationId,
       interactionToken,
-      "This confirmation expired. Ask again to get a new button.",
+      "This confirmation expired. Ask again in a DM to get a new button.",
     );
     return;
   }
@@ -109,17 +120,40 @@ export async function handleDiscordActionConfirm(
     return;
   }
 
-  const res = await runProductAction({
-    actionId: check.actionId,
-    params: pending.params,
-  });
-
-  if (res.ok) {
-    const output = res.body ? `\n\`\`\`\n${res.body.slice(0, 1500)}\n\`\`\`` : "";
+  if (!discordUserId) {
     await editDiscordInteractionResponse(
       applicationId,
       interactionToken,
-      `Action executed successfully.${output}`,
+      "Could not identify your Discord user.",
+    );
+    return;
+  }
+
+  const link = await getDiscordChannelLink(productId, discordUserId);
+  if (!link) {
+    await editDiscordInteractionResponse(
+      applicationId,
+      interactionToken,
+      "Connect your wallet first. In this DM run `/connect`, open the link, then try again.",
+    );
+    return;
+  }
+
+  const res = await runProductAction({
+    actionId: check.actionId,
+    params: pending.params,
+    payerUserId: link.userId,
+    agentId: link.agentId,
+  });
+
+  if (res.ok) {
+    const paid = res.paid ? `\nPaid: ${res.paid} USDC` : "";
+    const proof = res.txHash ? `\nTx: \`${res.txHash}\`` : "";
+    const output = res.body ? `\n\`\`\`\n${res.body.slice(0, 1200)}\n\`\`\`` : "";
+    await editDiscordInteractionResponse(
+      applicationId,
+      interactionToken,
+      `Action executed successfully!${paid}${proof}${output}`,
     );
     return;
   }
@@ -136,7 +170,8 @@ export async function handleDiscordAsk(
   applicationId: string,
   interactionToken: string,
   question: string,
-  discordUserId?: string | null,
+  discordUserId: string | null | undefined,
+  isDm: boolean,
 ): Promise<void> {
   const llm = getLlmConfig();
   if (!llm) {
@@ -153,7 +188,6 @@ export async function handleDiscordAsk(
     getProductActionsForChat(product.id),
   ]);
 
-  // Each /ask is single-turn — never open with a canned greeting.
   const system = buildWidgetSystemPrompt(product, content, actions, {
     allowGreeting: false,
   });
@@ -203,6 +237,38 @@ export async function handleDiscordAsk(
 
           const args = safeParseArgs(call.function.arguments);
           const proposed = proposeWidgetAction(action, args);
+
+          // Paid capability actions: DMs only + linked wallet.
+          if (action.kind === "capability") {
+            if (!isDm) {
+              await editDiscordInteractionResponse(
+                applicationId,
+                interactionToken,
+                `${proposed.reply}\n\n**Paid actions are DM-only.** Message this bot privately → \`/connect\` → then \`/ask\` again in the DM.`,
+              );
+              return;
+            }
+
+            if (!discordUserId) {
+              await editDiscordInteractionResponse(
+                applicationId,
+                interactionToken,
+                "Could not identify your Discord user.",
+              );
+              return;
+            }
+
+            const link = await getDiscordChannelLink(product.id, discordUserId);
+            if (!link) {
+              await editDiscordInteractionResponse(
+                applicationId,
+                interactionToken,
+                `${proposed.reply}\n\nConnect your wallet first: run \`/connect\` in this DM, open the link, then ask again.`,
+              );
+              return;
+            }
+          }
+
           const pendingToken = await createPendingActionConfirm({
             productId: product.id,
             actionId: action.id,
@@ -214,7 +280,7 @@ export async function handleDiscordAsk(
           await editDiscordInteractionResponse(
             applicationId,
             interactionToken,
-            proposed.reply,
+            `${proposed.reply}\n\nNeed a linked wallet? Run \`/connect\` in this DM first.`,
             runPendingButton(pendingToken),
           );
           return;

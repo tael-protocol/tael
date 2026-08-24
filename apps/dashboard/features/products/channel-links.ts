@@ -8,10 +8,10 @@ export interface ResolvedChannelLink {
   agentId: string;
 }
 
-/** Look up a Telegram user's linked Card for a product bot. */
-export async function getTelegramChannelLink(
+async function getChannelLink(
+  channel: "telegram" | "discord",
   productId: string,
-  telegramUserId: string,
+  externalUserId: string,
 ): Promise<ResolvedChannelLink | null> {
   const [row] = await db
     .select({
@@ -21,9 +21,9 @@ export async function getTelegramChannelLink(
     .from(channelLinks)
     .where(
       and(
-        eq(channelLinks.channel, "telegram"),
+        eq(channelLinks.channel, channel),
         eq(channelLinks.productId, productId),
-        eq(channelLinks.externalUserId, telegramUserId),
+        eq(channelLinks.externalUserId, externalUserId),
       ),
     )
     .limit(1);
@@ -32,10 +32,10 @@ export async function getTelegramChannelLink(
   return { userId: row.userId, agentId: row.agentId };
 }
 
-/** Upsert Telegram → user + Card link for a product. Verifies Card ownership. */
-export async function upsertTelegramChannelLink(input: {
+async function upsertChannelLink(input: {
+  channel: "telegram" | "discord";
   productId: string;
-  telegramUserId: string;
+  externalUserId: string;
   userId: string;
   agentId: string;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -47,7 +47,7 @@ export async function upsertTelegramChannelLink(input: {
 
   if (!card) return { ok: false, error: "That Card does not belong to you." };
 
-  const existing = await getTelegramChannelLink(input.productId, input.telegramUserId);
+  const existing = await getChannelLink(input.channel, input.productId, input.externalUserId);
   if (existing) {
     await db
       .update(channelLinks)
@@ -58,16 +58,16 @@ export async function upsertTelegramChannelLink(input: {
       })
       .where(
         and(
-          eq(channelLinks.channel, "telegram"),
+          eq(channelLinks.channel, input.channel),
           eq(channelLinks.productId, input.productId),
-          eq(channelLinks.externalUserId, input.telegramUserId),
+          eq(channelLinks.externalUserId, input.externalUserId),
         ),
       );
   } else {
     await db.insert(channelLinks).values({
-      channel: "telegram",
+      channel: input.channel,
       productId: input.productId,
-      externalUserId: input.telegramUserId,
+      externalUserId: input.externalUserId,
       userId: input.userId,
       agentId: input.agentId,
     });
@@ -76,18 +76,82 @@ export async function upsertTelegramChannelLink(input: {
   return { ok: true };
 }
 
-/** Remove a Telegram link for this product. */
-export async function deleteTelegramChannelLink(
+async function deleteChannelLink(
+  channel: "telegram" | "discord",
   productId: string,
-  telegramUserId: string,
+  externalUserId: string,
 ): Promise<void> {
   await db
     .delete(channelLinks)
     .where(
       and(
-        eq(channelLinks.channel, "telegram"),
+        eq(channelLinks.channel, channel),
         eq(channelLinks.productId, productId),
-        eq(channelLinks.externalUserId, telegramUserId),
+        eq(channelLinks.externalUserId, externalUserId),
       ),
     );
+}
+
+/** Look up a Telegram user's linked Card for a product bot. */
+export async function getTelegramChannelLink(
+  productId: string,
+  telegramUserId: string,
+): Promise<ResolvedChannelLink | null> {
+  return getChannelLink("telegram", productId, telegramUserId);
+}
+
+/** Upsert Telegram → user + Card link for a product. Verifies Card ownership. */
+export async function upsertTelegramChannelLink(input: {
+  productId: string;
+  telegramUserId: string;
+  userId: string;
+  agentId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  return upsertChannelLink({
+    channel: "telegram",
+    productId: input.productId,
+    externalUserId: input.telegramUserId,
+    userId: input.userId,
+    agentId: input.agentId,
+  });
+}
+
+/** Remove a Telegram link for this product. */
+export async function deleteTelegramChannelLink(
+  productId: string,
+  telegramUserId: string,
+): Promise<void> {
+  return deleteChannelLink("telegram", productId, telegramUserId);
+}
+
+/** Look up a Discord user's linked Card for a product bot. */
+export async function getDiscordChannelLink(
+  productId: string,
+  discordUserId: string,
+): Promise<ResolvedChannelLink | null> {
+  return getChannelLink("discord", productId, discordUserId);
+}
+
+/** Upsert Discord → user + Card link for a product. Verifies Card ownership. */
+export async function upsertDiscordChannelLink(input: {
+  productId: string;
+  discordUserId: string;
+  userId: string;
+  agentId: string;
+}): Promise<{ ok: true } | { ok: false; error: string }> {
+  return upsertChannelLink({
+    channel: "discord",
+    productId: input.productId,
+    externalUserId: input.discordUserId,
+    userId: input.userId,
+    agentId: input.agentId,
+  });
+}
+
+/** Remove a Discord link for this product. */
+export async function deleteDiscordChannelLink(
+  productId: string,
+  discordUserId: string,
+): Promise<void> {
+  return deleteChannelLink("discord", productId, discordUserId);
 }

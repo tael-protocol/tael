@@ -104,21 +104,22 @@ export async function getDiscordBotInfo(
   }
 }
 
-/** Register the product /ask slash command on this application. */
+/** Register product slash commands (ask + wallet) with DM support. */
 export async function registerDiscordAskCommand(
   token: string,
   applicationId: string,
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    const res = await fetch(`${DISCORD_API_BASE}/applications/${applicationId}/commands`, {
-      method: "POST",
-      headers: {
-        authorization: `Bot ${token}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
+    // Bulk overwrite keeps guild + DM commands in sync.
+    // contexts: 0=Guild, 1=Bot DM, 2=Private channel
+    // integration_types: 0=Guild install, 1=User install
+    const commands = [
+      {
         name: "ask",
-        description: "Ask this product agent a question",
+        description: "Ask this product agent a question (use DMs for paid actions)",
+        dm_permission: true,
+        integration_types: [0, 1],
+        contexts: [0, 1, 2],
         options: [
           {
             name: "question",
@@ -127,12 +128,42 @@ export async function registerDiscordAskCommand(
             required: true,
           },
         ],
-      }),
-      signal: AbortSignal.timeout(10_000),
+      },
+      {
+        name: "connect",
+        description: "Link your Stellar wallet + Card for paid actions (DM recommended)",
+        dm_permission: true,
+        integration_types: [0, 1],
+        contexts: [0, 1, 2],
+      },
+      {
+        name: "wallet",
+        description: "Check whether your wallet is linked to this bot",
+        dm_permission: true,
+        integration_types: [0, 1],
+        contexts: [0, 1, 2],
+      },
+      {
+        name: "disconnect",
+        description: "Unlink your wallet from this bot",
+        dm_permission: true,
+        integration_types: [0, 1],
+        contexts: [0, 1, 2],
+      },
+    ];
+
+    const res = await fetch(`${DISCORD_API_BASE}/applications/${applicationId}/commands`, {
+      method: "PUT",
+      headers: {
+        authorization: `Bot ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(commands),
+      signal: AbortSignal.timeout(15_000),
     });
     const data = (await res.json().catch(() => null)) as { message?: string; code?: number } | null;
     if (!res.ok) {
-      return { ok: false, error: data?.message ?? "Failed to register /ask command." };
+      return { ok: false, error: data?.message ?? "Failed to register Discord commands." };
     }
     return { ok: true };
   } catch {
@@ -140,29 +171,26 @@ export async function registerDiscordAskCommand(
   }
 }
 
-/** Best-effort cleanup of the /ask command on disconnect. */
+/** Best-effort cleanup of product commands on disconnect. */
 export async function deleteDiscordAskCommand(token: string, applicationId: string): Promise<void> {
   try {
-    const listRes = await fetch(`${DISCORD_API_BASE}/applications/${applicationId}/commands`, {
-      method: "GET",
+    await fetch(`${DISCORD_API_BASE}/applications/${applicationId}/commands`, {
+      method: "PUT",
       headers: {
         authorization: `Bot ${token}`,
         "content-type": "application/json",
       },
-      signal: AbortSignal.timeout(10_000),
-    });
-    if (!listRes.ok) return;
-    const commands = (await listRes.json().catch(() => [])) as { id: string; name: string }[];
-    const ask = commands.find((c) => c.name === "ask");
-    if (!ask) return;
-    await fetch(`${DISCORD_API_BASE}/applications/${applicationId}/commands/${ask.id}`, {
-      method: "DELETE",
-      headers: { authorization: `Bot ${token}` },
+      body: JSON.stringify([]),
       signal: AbortSignal.timeout(10_000),
     });
   } catch {
     // best-effort
   }
+}
+
+/** True when the interaction is a bot DM (not a server channel). */
+export function isDiscordDm(interaction: DiscordInteraction): boolean {
+  return !interaction.guild_id;
 }
 
 /** Follow up on a deferred interaction with the final reply. */
@@ -195,15 +223,7 @@ export async function editDiscordInteractionResponse(
   }
 }
 
-/** Build the OAuth invite URL for a product bot. */
-export function buildDiscordInviteUrl(clientId: string): string {
-  const params = new URLSearchParams({
-    client_id: clientId,
-    scope: "bot applications.commands",
-    permissions: "2147485696", // Send Messages + Use Application Commands
-  });
-  return `https://discord.com/oauth2/authorize?${params.toString()}`;
-}
+export { buildDiscordInviteUrl, buildDiscordUserInstallUrl } from "./discord-urls";
 
 /** Extract a slash-command string option by name. */
 export function getDiscordOptionString(

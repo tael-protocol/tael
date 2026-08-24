@@ -202,7 +202,7 @@ export async function connectDiscordBot(
   const applicationId = parsedClientId.data;
   const cmdResult = await registerDiscordAskCommand(cleanToken, applicationId);
   if (!cmdResult.ok) {
-    return { ok: false, error: cmdResult.error ?? "Could not register /ask command." };
+    return { ok: false, error: cmdResult.error ?? "Could not register Discord commands." };
   }
 
   const interactionsUrl = `${baseUrl.replace(/\/$/, "")}/api/widget/${encodeURIComponent(product.publicKey)}/discord`;

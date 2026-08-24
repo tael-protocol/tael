@@ -78,7 +78,7 @@ export async function runProductAction(input: {
 
   if (row.kind === "capability") {
     let payerUserId: string;
-    let agentId = input.agentId;
+    const agentId = input.agentId;
 
     if (input.payerUserId) {
       payerUserId = input.payerUserId;
