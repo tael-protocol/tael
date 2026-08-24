@@ -148,14 +148,6 @@ export function formatActionResultForChat(input: FormatActionResultInput): strin
   return parts.join("\n").slice(0, 1900);
 }
 
-/** Prefix Discord replies so slash-command questions stay visible in the thread. */
-export function withDiscordAskContext(question: string, body: string): string {
-  const q = question.trim();
-  if (!q) return body;
-  const header = `**You asked:** ${q.length > 280 ? `${q.slice(0, 280)}…` : q}`;
-  return `${header}\n\n${body}`.slice(0, 2000);
-}
-
 /** Convert Discord-ish markdown links/bold to Telegram HTML. */
 export function discordMarkdownToTelegramHtml(text: string): string {
   let s = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
