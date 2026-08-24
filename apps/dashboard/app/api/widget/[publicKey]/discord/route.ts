@@ -128,9 +128,7 @@ export async function POST(request: Request, context: { params: Promise<{ public
       });
     }
 
-    after(() =>
-      handleDiscordAsk(product, applicationId, interaction.token, question, userId),
-    );
+    after(() => handleDiscordAsk(product, applicationId, interaction.token, question, userId));
     return jsonResponse({ type: DISCORD_CALLBACK_DEFERRED_CHANNEL_MESSAGE });
   }
 

@@ -169,7 +169,7 @@ export function buildWidgetSystemPrompt(
             return `- ${a.name} (${a.kind})${suffix}: ${a.description}`;
           }),
           "",
-          "For capability actions that need inputs (e.g. Pay: destination + amount), put them in the tool `params` as a JSON object like {\"to\":\"G…\",\"amount\":\"0.05\"} or as a query string to=G…&amount=0.05.",
+          'For capability actions that need inputs (e.g. Pay: destination + amount), put them in the tool `params` as a JSON object like {"to":"G…","amount":"0.05"} or as a query string to=G…&amount=0.05.',
         ]
       : [];
 
@@ -181,7 +181,7 @@ export function buildWidgetSystemPrompt(
         'Never start a reply with a canned greeting like "How can I help you?" unless this is the first message and that phrase is the configured opening greeting.',
       ]
     : [
-        "This is a continuing conversation. Do NOT greet. Do NOT say hello, hi, or \"How can I help you?\". Answer the user's latest message directly.",
+        'This is a continuing conversation. Do NOT greet. Do NOT say hello, hi, or "How can I help you?". Answer the user\'s latest message directly.',
       ];
 
   const parts = [

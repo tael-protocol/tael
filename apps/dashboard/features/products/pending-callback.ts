@@ -4,7 +4,9 @@ export function buildPendingCallbackData(token: string): string {
 }
 
 /** Parse `c:<token>` or legacy `a:<hex>:<params>` / `run_action:…`. */
-export function parseActionCallbackData(data: string):
+export function parseActionCallbackData(
+  data: string,
+):
   | { kind: "pending"; token: string }
   | { kind: "legacy"; actionIdHex: string; paramsStr: string }
   | null {

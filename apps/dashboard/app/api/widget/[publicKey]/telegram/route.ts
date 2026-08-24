@@ -59,9 +59,7 @@ function safeParseArgs(raw: string | undefined): Record<string, unknown> {
 }
 
 /** Normalize tool params into a value we can store + later run. */
-function normalizeToolParams(
-  raw: unknown,
-): string | Record<string, unknown> | null {
+function normalizeToolParams(raw: unknown): string | Record<string, unknown> | null {
   if (raw == null) return null;
   if (typeof raw === "object" && !Array.isArray(raw)) {
     return raw as Record<string, unknown>;

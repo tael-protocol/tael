@@ -4,10 +4,7 @@ import { and, eq, gt, pendingActionConfirms } from "@tael/database";
 import { randomBytes } from "node:crypto";
 import { db } from "../../lib/db";
 
-export {
-  buildPendingCallbackData,
-  parseActionCallbackData,
-} from "./pending-callback";
+export { buildPendingCallbackData, parseActionCallbackData } from "./pending-callback";
 
 const TTL_MS = 15 * 60 * 1000;
 
@@ -78,11 +75,7 @@ export async function consumePendingActionConfirm(input: {
 
   if (!row) return null;
 
-  if (
-    row.externalUserId &&
-    input.externalUserId &&
-    row.externalUserId !== input.externalUserId
-  ) {
+  if (row.externalUserId && input.externalUserId && row.externalUserId !== input.externalUserId) {
     return null;
   }
 

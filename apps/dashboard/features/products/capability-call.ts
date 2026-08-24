@@ -19,10 +19,7 @@ export interface CapabilityRequest {
  * Accepts either `{ slug: "stellar", operation: "pay" }` or combined
  * `{ slug: "stellar/pay" }` (legacy Studio entries).
  */
-export function resolveCapabilityRef(config: {
-  slug: string;
-  operation?: string;
-}): CapabilityRef {
+export function resolveCapabilityRef(config: { slug: string; operation?: string }): CapabilityRef {
   const rawSlug = config.slug.trim().replace(/^\/+|\/+$/g, "");
   const op = config.operation?.trim();
   if (op) {

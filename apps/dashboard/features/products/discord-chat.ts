@@ -2,10 +2,7 @@ import type { Product } from "@tael/database";
 import { createLlmChatCompletion, getLlmConfig } from "../../lib/llm";
 import { getProductActionsForChat, getProductContentForChat } from "./queries";
 import { editDiscordInteractionResponse } from "./discord";
-import {
-  createPendingActionConfirm,
-  consumePendingActionConfirm,
-} from "./pending-action-confirms";
+import { createPendingActionConfirm, consumePendingActionConfirm } from "./pending-action-confirms";
 import { getEnabledActionForPublicKey, runProductAction } from "./run-product-action";
 import {
   actionIdFromToolName,
@@ -44,9 +41,7 @@ function safeParseArgs(raw: string | undefined): Record<string, unknown> {
   }
 }
 
-function normalizeToolParams(
-  raw: unknown,
-): string | Record<string, unknown> | null {
+function normalizeToolParams(raw: unknown): string | Record<string, unknown> | null {
   if (raw == null) return null;
   if (typeof raw === "object" && !Array.isArray(raw)) {
     return raw as Record<string, unknown>;

@@ -1,8 +1,6 @@
 import { getEnabledActionForPublicKey, runProductAction } from "./run-product-action";
 import { getTelegramChannelLink } from "./channel-links";
-import {
-  consumePendingActionConfirm,
-} from "./pending-action-confirms";
+import { consumePendingActionConfirm } from "./pending-action-confirms";
 import { parseActionCallbackData } from "./pending-callback";
 import {
   answerTelegramCallbackQuery,
