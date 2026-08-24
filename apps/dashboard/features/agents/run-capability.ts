@@ -224,7 +224,12 @@ export async function runCapability(input: {
       });
       const body = await direct.text();
       if (!direct.ok) {
-        return { ok: false, status: direct.status, body, error: friendlyError(direct.status) };
+        return {
+          ok: false,
+          status: direct.status,
+          body,
+          error: capabilityErrorMessage(direct.status, body),
+        };
       }
       // Action ops return a `tael_action` intent to SIGN, not data. If we get
       // one, the agent's card signs it and submits it on-chain (with Tael's fee
@@ -330,7 +335,12 @@ export async function runCapability(input: {
     });
     const body = await res.text();
     if (!res.ok) {
-      return { ok: false, status: res.status, body, error: friendlyError(res.status) };
+      return {
+        ok: false,
+        status: res.status,
+        body,
+        error: capabilityErrorMessage(res.status, body),
+      };
     }
     // Call succeeded and the response is in hand. If this agent carries a
     // TrustLine balance and now holds spare cash, opportunistically pay it down
@@ -368,6 +378,20 @@ function friendlyError(status: number): string {
   if (status === 404) return "This capability is no longer available.";
   if (status >= 500) return "The agent couldn't pay, or the upstream API is down. Try again.";
   return `The call failed (${status}).`;
+}
+
+/** Prefer the capability's `{ error }` body when present (e.g. missing address). */
+function capabilityErrorMessage(status: number, body: string): string {
+  try {
+    const parsed: unknown = JSON.parse(body);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      const err = (parsed as Record<string, unknown>).error;
+      if (typeof err === "string" && err.trim()) return err.trim();
+    }
+  } catch {
+    // ignore
+  }
+  return friendlyError(status);
 }
 
 /** The validated Pay intent an action capability returns to be signed. */
