@@ -127,6 +127,13 @@
       "when": 1787479200000,
       "tag": "0017_channel_links",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1787546400000,
+      "tag": "0018_pending_action_confirms",
+      "breakpoints": true
     }
   ]
 }

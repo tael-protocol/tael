@@ -8,6 +8,7 @@ import { apiKeys } from "./api-keys";
 import { chatThreads, chatMessages } from "./chat";
 import { products, productContent, productActions } from "./products";
 import { channelLinks } from "./channel-links";
+import { pendingActionConfirms } from "./pending-action-confirms";
 
 // Typed relations enable Drizzle's relational query API (db.query.users.findMany
 // with `with: { wallets: true }`, etc.) without hand-written joins.
@@ -61,18 +62,31 @@ export const productsRelations = relations(products, ({ one, many }) => ({
   content: many(productContent),
   actions: many(productActions),
   channelLinks: many(channelLinks),
+  pendingActionConfirms: many(pendingActionConfirms),
 }));
 
 export const productContentRelations = relations(productContent, ({ one }) => ({
   product: one(products, { fields: [productContent.productId], references: [products.id] }),
 }));
 
-export const productActionsRelations = relations(productActions, ({ one }) => ({
+export const productActionsRelations = relations(productActions, ({ one, many }) => ({
   product: one(products, { fields: [productActions.productId], references: [products.id] }),
+  pendingConfirms: many(pendingActionConfirms),
 }));
 
 export const channelLinksRelations = relations(channelLinks, ({ one }) => ({
   user: one(users, { fields: [channelLinks.userId], references: [users.id] }),
   agent: one(agents, { fields: [channelLinks.agentId], references: [agents.id] }),
   product: one(products, { fields: [channelLinks.productId], references: [products.id] }),
+}));
+
+export const pendingActionConfirmsRelations = relations(pendingActionConfirms, ({ one }) => ({
+  product: one(products, {
+    fields: [pendingActionConfirms.productId],
+    references: [products.id],
+  }),
+  action: one(productActions, {
+    fields: [pendingActionConfirms.actionId],
+    references: [productActions.id],
+  }),
 }));
