@@ -7,6 +7,7 @@ import {
   editTelegramMessageText,
   type TelegramCallbackQuery,
 } from "./telegram";
+import { discordMarkdownToTelegramHtml, formatActionResultForChat } from "./format-action-result";
 
 /** Reconstructs UUID from 32-hex actionId in legacy callback_data. */
 function parseCallbackActionId(rawHex: string): string {
@@ -92,20 +93,18 @@ export async function handleTelegramActionCallback(input: {
   });
 
   if (res.ok) {
-    const paid = res.paid ? `\nPaid: ${res.paid} USDC` : "";
-    const proof = res.txHash ? `\nTx: <code>${res.txHash}</code>` : "";
-    const safeBody = res.body
-      ? `\n\n<pre>${res.body
-          .slice(0, 1500)
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")}</pre>`
-      : "";
     await editTelegramMessageText(
       token,
       chatId,
       messageId,
-      `Action executed successfully!${paid}${proof}${safeBody}`,
+      discordMarkdownToTelegramHtml(
+        formatActionResultForChat({
+          ok: true,
+          body: res.body,
+          paid: res.paid,
+          txHash: res.txHash,
+        }),
+      ),
       { parseMode: "HTML" },
     );
   } else {
@@ -113,7 +112,13 @@ export async function handleTelegramActionCallback(input: {
       token,
       chatId,
       messageId,
-      `Action failed: ${res.error ?? "Unknown error"}`,
+      discordMarkdownToTelegramHtml(
+        formatActionResultForChat({
+          ok: false,
+          error: res.error ?? "Unknown error",
+        }),
+      ),
+      { parseMode: "HTML" },
     );
   }
 
