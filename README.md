@@ -6,7 +6,7 @@
 
 **Pay for any API. Get paid for yours.**
 
-Agents, MCP tools, and APIs supported. Payments settled in USDC on Stellar.
+Agents, MCP tools, and APIs supported. Payments settled in USDC.
 
 [Read the Docs](https://taelprotocol.xyz/docs) &nbsp;·&nbsp;
 [Live app](https://app.taelprotocol.xyz) &nbsp;·&nbsp;
