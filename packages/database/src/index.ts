@@ -4,6 +4,8 @@
 // the schema types are re-exported for repositories and services.
 export * from "./client";
 export * from "./crypto";
+export * from "./errors";
+export * from "./ssl";
 export * as schema from "./schema";
 export * from "./schema";
 

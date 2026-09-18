@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "./schema";
+import { sslForConnectionString } from "./ssl";
 
 export type Database = ReturnType<typeof createDatabase>;
 
@@ -10,10 +11,15 @@ export type Database = ReturnType<typeof createDatabase>;
  * many short-lived serverless connections. Migrations use the direct/session URL.
  */
 export function createDatabase(connectionString: string) {
+  const ssl = sslForConnectionString(connectionString);
   const client = postgres(connectionString, {
     // The transaction pooler doesn't support prepared statements.
     prepare: false,
-    max: 10,
+    // One connection per serverless isolate — the pooler already multiplexes.
+    max: process.env.VERCEL ? 1 : 10,
+    idle_timeout: 20,
+    connect_timeout: 10,
+    ...(ssl ? { ssl } : {}),
   });
   return drizzle(client, { schema, casing: "snake_case" });
 }
