@@ -596,6 +596,9 @@ importers:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.6(@types/node@22.20.0)(jiti@1.21.7)(tsx@4.23.0)
 
   packages/payments:
     dependencies:
